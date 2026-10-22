@@ -35,7 +35,8 @@ class Dialog(QDialog):
     def __init__(self, title, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setMinimumWidth(420)
+        # A fixed width: the text's height is measured at it, and a tiling window manager keeps it.
+        self.setFixedWidth(420)
         self.layout_ = QVBoxLayout(self)
         self.layout_.setContentsMargins(24, 22, 24, 20)
         self.layout_.setSpacing(0)
@@ -58,18 +59,28 @@ class Dialog(QDialog):
 
     def _fit_text(self):
         """A wrapped label reports a one-line height, so a window manager that sizes the dialog
-        from its hint (Hyprland, for one) cuts the text. Reserve each one's real height."""
-        self.layout_.activate()
+        from its hint (Hyprland, for one) cuts the text. Reserve each one's real height at the
+        dialog's real width; recomputed whenever that width changes."""
         margins = self.layout_.contentsMargins()
-        width = max(self.width(), self.minimumWidth()) - margins.left() - margins.right()
+        width = self.width() - margins.left() - margins.right()
+        changed = False
         for label in self.findChildren(QLabel):
             if label.wordWrap() and label.isVisibleTo(self):
-                label.setMinimumHeight(label.heightForWidth(width))
-        self.adjustSize()
+                height = label.heightForWidth(width)
+                if label.minimumHeight() != height:
+                    label.setMinimumHeight(height)
+                    changed = True
+        if changed and self.height() < self.minimumSizeHint().height():
+            self.resize(self.width(), self.minimumSizeHint().height())
 
     def showEvent(self, event):
         self._fit_text()
         super().showEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if event.oldSize().width() != event.size().width():
+            self._fit_text()
 
     def field(self, label, widget):
         caption = QLabel(label)
