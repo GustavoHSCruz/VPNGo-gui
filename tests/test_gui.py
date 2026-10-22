@@ -375,8 +375,11 @@ class WindowTest(FakeCli):
         self.settle(lambda: not controller.busy)
         controller.profile_act("br", "remove")
         self.settle(lambda: not controller.busy)
+        with patch.object(dialogs.ConfirmDialog, "exec", return_value=dialogs.QDialog.DialogCode.Accepted):
+            controller.act("vesktop", "remove", None)
+        self.settle(lambda: not controller.busy)
         self.assertEqual(self.log(), [["policy", "steam", "dns", "on"], ["app", "remove", "spotify"],
-                                      ["profile", "remove", "br"]])
+                                      ["profile", "remove", "br"], ["stop", "vesktop"], ["app", "remove", "vesktop"]])
         self.settle(lambda: "spotify" not in controller.window.tiles)
 
     def test_direct_tiles_look_up_the_public_ip_only_when_asked(self):

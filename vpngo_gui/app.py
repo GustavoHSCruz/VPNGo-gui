@@ -235,10 +235,13 @@ class Controller(QObject):
             # vpngo start closes the copy opened outside it, then opens the app on its VPN profile.
             text, label, steps = tr("action_reopen", app=name), tr("busy_start"), [["start", name]]
         elif action == "remove":
-            dialog = ConfirmDialog(tr("remove_title", app=name), tr("remove_body"), tr("remove"), self.window)
+            body = tr("remove_body_running", app=name) if app.running else tr("remove_body")
+            dialog = ConfirmDialog(tr("remove_title", app=name), body, tr("remove"), self.window)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
-            text, label, steps = tr("action_remove", app=name), tr("busy_remove"), [["app", "remove", name]]
+            # vpngo forgets only a stopped app, so a running one is closed first.
+            steps = ([["stop", name]] if app.running else []) + [["app", "remove", name]]
+            text, label = tr("action_remove", app=name), tr("busy_remove")
         else:
             text = tr({"start": "action_start", "stop": "action_stop", "on": "action_on",
                        "off": "action_off"}[action], app=name)

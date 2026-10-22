@@ -402,7 +402,7 @@ class AppTile(Tile):
             dns.setEnabled(app.killswitch)
             dns.triggered.connect(lambda on: emit(self.name, "policy", ("dns", on)))
             self.menu.addAction(dns)
-        if self.manages and not app.running:
+        if self.manages:
             self.menu.addSeparator()
             self.menu.addAction(tr("remove_app"), lambda: emit(self.name, "remove", None))
 
