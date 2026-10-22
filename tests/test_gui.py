@@ -154,12 +154,18 @@ class WindowTest(FakeCli):
             loop.exec()
         self.assertTrue(until())
 
+    def drain(self):
+        from PySide6.QtCore import QCoreApplication, QEvent
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        QCoreApplication.processEvents()
+
     def controller(self):
         from vpngo_gui.app import Controller
         application = QApplication.instance() or QApplication([])
         controller = Controller(application)
         controller.timer.stop()
-        self.addCleanup(lambda: controller.broker and controller.broker.close())
+        self.addCleanup(self.drain)
+        self.addCleanup(controller.shutdown)
         self.settle(lambda: controller.current is not None)
         return controller
 
@@ -226,6 +232,23 @@ class WindowTest(FakeCli):
         self.assertIsNone(app_key("/tmp/$weird"))
         self.assertEqual(profile_from_file("/x/US-Free 82.conf"), "us-free-82")
         self.assertEqual(profile_from_file("/x/01-br.conf"), "br")
+
+
+
+def tearDownModule():
+    # Destroy every Qt wrapper while the QApplication still exists; PySide can crash if
+    # Python's interpreter shutdown deletes them in arbitrary order afterwards.
+    if QApplication is None or QApplication.instance() is None:
+        return
+    import gc
+    from PySide6.QtCore import QCoreApplication, QEvent
+    for widget in QApplication.topLevelWidgets():
+        widget.close()
+        widget.deleteLater()
+    for _ in range(3):
+        gc.collect()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        QCoreApplication.processEvents()
 
 
 if __name__ == "__main__":

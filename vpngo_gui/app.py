@@ -185,11 +185,25 @@ class Controller(QObject):
         else:
             self.show_window()
 
-    def quit(self):
+    def shutdown(self):
+        """Tear Qt objects down in order; leaving it to interpreter exit can crash in Qt's destructors."""
+        self.timer.stop()
+        # Work still running in threads must not reach widgets that are about to be deleted.
+        self.results.blockSignals(True)
         if self.broker:
             self.broker.close()
+            self.broker = None
         if self.tray:
             self.tray.hide()
+            self.tray.setContextMenu(None)
+            self.tray.menu.deleteLater()
+            self.tray.deleteLater()
+            self.tray = None
+        self.window.keep_in_tray = False
+        self.window.close()
+        self.window.deleteLater()
+
+    def quit(self):
         self.application.quit()
 
 
@@ -227,7 +241,9 @@ def main(hidden=False):
     server.newConnection.connect(lambda: (server.nextPendingConnection(), controller.show_window()))
     if not hidden or controller.tray is None:
         controller.show_window()
-    application.aboutToQuit.connect(lambda: controller.broker and controller.broker.close())
+    application.aboutToQuit.connect(controller.shutdown)
     if controller.tray is None:
         application.setQuitOnLastWindowClosed(True)
-    return application.exec()
+    code = application.exec()
+    server.close()
+    return code

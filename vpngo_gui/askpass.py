@@ -92,6 +92,7 @@ class Broker:
 
     def close(self):
         self.server.close()
+        self.server.deleteLater()
         for path in (self.socket_path, self.script):
             path.unlink(missing_ok=True)
         try:
