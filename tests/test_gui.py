@@ -131,6 +131,7 @@ class StatsTest(unittest.TestCase):
             stale.load(path)
         self.assertEqual(stale.history, {})
 
+    @unittest.skipIf(QApplication is None, "PySide6 is not installed")
     def test_two_clocks_one_per_route(self):
         from vpngo_gui.stats import short_duration
         from vpngo_gui.window import route_clocks, route_tip
