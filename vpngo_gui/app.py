@@ -311,7 +311,9 @@ class Controller(QObject):
             return
         path, name, profile, start, once = dialog.values()
         if once:
-            return self.run("temp:" + name, tr("action_temp", app=name), [["--temp", profile, path, "-d"]],
+            # Windows runs vpngo.ps1 directly, which takes the form vpngo.cmd translates --temp into.
+            step = ["temp", profile, path, "detach"] if os.name == "nt" else ["--temp", profile, path, "-d"]
+            return self.run("temp:" + name, tr("action_temp", app=name), [step],
                             success=tr("temp_started", app=name))
         steps = [["config", path], ["assign", name, profile]] + ([["start", name]] if start else [])
         self.run(name, tr("action_add_app", app=name), steps)
