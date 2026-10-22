@@ -1,4 +1,4 @@
-"""Add-app, add-profile and password dialogs."""
+"""Add-app, add-profile, new-group, confirmation and password dialogs."""
 
 import re
 import threading
@@ -15,6 +15,7 @@ from .i18n import tr
 
 APP_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_. -]{0,79}")
 PROFILE_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
+GROUP_NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 
 
 def app_key(path):
@@ -115,7 +116,12 @@ class AddAppDialog(Dialog):
         self.layout_.addSpacing(14)
         self.start_now = QCheckBox(tr("start_now"))
         self.layout_.addWidget(self.start_now)
+        self.layout_.addSpacing(8)
+        self.once = QCheckBox(tr("temp_once"))
+        self.once.toggled.connect(lambda once: self.start_now.setEnabled(not once))
+        self.layout_.addWidget(self.once)
         self.buttons(tr("add"))
+        self.once.toggled.connect(lambda once: self.confirm.setText(tr("start") if once else tr("add")))
 
     def submit(self):
         path = self.path.text().strip()
@@ -126,8 +132,9 @@ class AddAppDialog(Dialog):
         self.accept()
 
     def values(self):
+        """path, app name, profile, start now, just this once (run without adding it)."""
         path = str(Path(self.path.text().strip()).expanduser())
-        return path, app_key(path), self.profile.currentText(), self.start_now.isChecked()
+        return path, app_key(path), self.profile.currentText(), self.start_now.isChecked(), self.once.isChecked()
 
 
 class AddProfileDialog(Dialog):
@@ -164,6 +171,44 @@ class AddProfileDialog(Dialog):
 
     def values(self):
         return self.name.text().strip().casefold(), str(Path(self.path.text().strip()).expanduser())
+
+
+class GroupDialog(Dialog):
+    def __init__(self, app, existing=(), parent=None):
+        super().__init__(tr("group_title"), parent)
+        self.existing = set(existing)
+        body = QLabel(tr("group_body", app=app))
+        body.setWordWrap(True)
+        body.setProperty("role", "muted")
+        self.layout_.addWidget(body)
+        self.name = QLineEdit()
+        self.name.setProperty("mono", True)
+        self.name.setPlaceholderText("jogos")
+        self.name.setMaxLength(32)
+        self.field(tr("group_name"), self.name)
+        self.buttons(tr("group_create"))
+        self.name.setFocus()
+
+    def submit(self):
+        name = self.name.text().strip().casefold()
+        if not GROUP_NAME.fullmatch(name):
+            return self.fail(tr("bad_group_name"))
+        if name in self.existing:
+            return self.fail(tr("group_exists"))
+        self.accept()
+
+    def value(self):
+        return self.name.text().strip().casefold()
+
+
+class ConfirmDialog(Dialog):
+    def __init__(self, title, text, confirm, parent=None):
+        super().__init__(title, parent)
+        body = QLabel(text)
+        body.setWordWrap(True)
+        body.setProperty("role", "muted")
+        self.layout_.addWidget(body)
+        self.buttons(confirm)
 
 
 class _Checked(QObject):

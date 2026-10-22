@@ -1,7 +1,9 @@
 """Parsing, command building, the askpass handshake and the window, against a fake vpngo."""
 
+import atexit
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,6 +16,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["VPNGO_LANG"] = "en-US"
+# Settings, saved history and the autostart entry go to a throwaway home, never the real one.
+SANDBOX = tempfile.mkdtemp(prefix="vpngo-gui-test-")
+os.environ.update(XDG_CONFIG_HOME=str(Path(SANDBOX) / "config"), VPNGO_GUI_PREFIX=str(Path(SANDBOX) / "gui"),
+                  APPDATA=str(Path(SANDBOX) / "appdata"), LOCALAPPDATA=str(Path(SANDBOX) / "local"))
 
 from vpngo_gui import cli
 from vpngo_gui.i18n import MESSAGES
@@ -23,6 +29,8 @@ try:
     from PySide6.QtWidgets import QApplication
 except ImportError:  # The pure-Python parts still run without PySide6.
     QApplication = None
+
+atexit.register(shutil.rmtree, SANDBOX, ignore_errors=True)
 
 FAKE = [sys.executable, str(ROOT / "tests/fake_vpngo.py")]
 DEMO = {
@@ -97,16 +105,41 @@ class StatsTest(unittest.TestCase):
     def app(self, rx, tx, state="vpn"):
         return cli.App(name="vesktop", profile="us", state=state, rx_bytes=rx, tx_bytes=tx)
 
-    def test_rates_come_from_counter_deltas_and_reset_when_counters_drop(self):
+    def test_rates_come_from_counter_deltas_and_skip_a_sample_when_counters_drop(self):
         from vpngo_gui.stats import Traffic
         traffic = Traffic()
         self.assertEqual(traffic.update([self.app(1000, 100)], now=0), {})
         self.assertEqual(traffic.update([self.app(7000, 400)], now=3), {"vesktop": (2000.0, 100.0)})
-        self.assertEqual(list(traffic.history["vesktop"]), [2100.0])
-        self.assertEqual(traffic.update([self.app(10, 5)], now=6), {})
-        self.assertEqual(list(traffic.history["vesktop"]), [])
-        traffic.update([self.app(None, None, "stopped")], now=9)
+        self.assertEqual(list(traffic.history["vesktop"]), [(2100.0, "vpn")])
+        self.assertEqual(traffic.update([self.app(10, 5, "direct")], now=6), {})
+        self.assertEqual(traffic.update([self.app(310, 5, "direct")], now=9), {"vesktop": (100.0, 0.0)})
+        self.assertEqual(list(traffic.history["vesktop"]), [(2100.0, "vpn"), (100.0, "direct")])
+        traffic.update([self.app(None, None, "stopped")], now=12)
         self.assertNotIn("vesktop", traffic.history)
+
+    def test_history_survives_a_quick_restart_only(self):
+        from vpngo_gui import stats
+        traffic = stats.Traffic()
+        traffic.history["vesktop"] = stats.deque([(5.0, "vpn"), (7.0, "direct")])
+        path = Path(SANDBOX) / "history.json"
+        traffic.save(path)
+        again = stats.Traffic()
+        again.load(path)
+        self.assertEqual(list(again.history["vesktop"]), [(5.0, "vpn"), (7.0, "direct")])
+        with patch.object(stats.time, "time", return_value=time.time() + stats.RESUME + 5):
+            stale = stats.Traffic()
+            stale.load(path)
+        self.assertEqual(stale.history, {})
+
+    def test_route_time_counts_from_the_last_switch(self):
+        from vpngo_gui.window import route_texts
+        now = time.time()
+        app = cli.App(name="vesktop", profile="us", state="direct", started_at=now - 16 * 3600,
+                      route_since=now - 10 * 60, vpn_seconds=15 * 3600 + 50 * 60, direct_seconds=600)
+        text, tip, short = route_texts(app)
+        self.assertEqual((text, short), ("10 min  ·  VPN 15 h 50 min", "10 min"))
+        self.assertIn("Direct for 10 min", tip)
+        self.assertIn("Open for 16 h 00 min", tip)
 
     def test_readable_rates_uptime_and_masked_addresses(self):
         from vpngo_gui.stats import masked, rate_text, split_endpoint, uptime_text
@@ -246,6 +279,102 @@ class WindowTest(FakeCli):
         self.assertEqual(server.text(), "146.70.•••.•••")
         self.assertEqual(controller.window.tiles["spotify"].server.text(), "")
 
+    def test_few_apps_open_into_the_detail_view(self):
+        data = json.loads(self.state.read_text())
+        data["apps"] = data["apps"][:1]
+        data["apps"][0].update(route_since=time.time() - 60, vpn_seconds=60, direct_seconds=0,
+                               route_rx_bytes=39_000_000, route_tx_bytes=2_100_000, rx_bytes=1, tx_bytes=1)
+        self.state.write_text(json.dumps(data))
+        controller = self.controller()
+        tile = controller.window.tiles["vesktop"]
+        self.assertTrue(tile.large)
+        self.assertTrue(controller.window.add_tile.slim)
+        self.assertEqual(tile.facts.values[3].text(), "↓ 39 MB ↑ 2.1 MB")
+        controller.window.fit_to_content()
+        self.assertLess(controller.window.height(), 560)
+
+    def test_groups_gather_tiles_and_act_as_one(self):
+        data = json.loads(self.state.read_text())
+        data["groups"] = {"games": ["steam", "spotify"]}
+        self.state.write_text(json.dumps(data))
+        controller = self.controller()
+        window = controller.window
+        header = window.headers["games"]
+        self.assertEqual(header.count.text(), "0 of 2 on VPN")
+        self.assertFalse(window.other_header.isHidden())
+        order = [widget for widget, _ in window.board.items]
+        self.assertEqual(order[:4], [header, window.tiles["steam"], window.tiles["spotify"], window.other_header])
+        header.switch.click()
+        self.settle(lambda: not controller.busy)
+        self.settle(lambda: header.count.text() == "2 of 2 on VPN")
+        controller.act("vesktop", "group_join", "games")
+        self.settle(lambda: not controller.busy)
+        controller.group_act("games", "switch", "br")
+        self.settle(lambda: not controller.busy)
+        self.assertEqual(self.log(), [["group", "on", "games"], ["group", "add", "games", "vesktop"],
+                                      ["group", "switch", "games", "br"]])
+        self.settle(lambda: window.other_header.isHidden())
+
+    def test_protection_and_removal_reach_vpngo(self):
+        from vpngo_gui import dialogs
+        controller = self.controller()
+        controller.act("steam", "policy", ("dns", True))
+        self.settle(lambda: not controller.busy)
+        with patch.object(dialogs.ConfirmDialog, "exec", return_value=dialogs.QDialog.DialogCode.Accepted):
+            controller.act("spotify", "remove", None)
+        self.settle(lambda: not controller.busy)
+        controller.profile_act("br", "remove")
+        self.settle(lambda: not controller.busy)
+        self.assertEqual(self.log(), [["policy", "steam", "dns", "on"], ["app", "remove", "spotify"],
+                                      ["profile", "remove", "br"]])
+        self.settle(lambda: "spotify" not in controller.window.tiles)
+
+    def test_direct_tiles_look_up_the_public_ip_only_when_asked(self):
+        from vpngo_gui import app as app_module
+        controller = self.controller()
+        server = controller.window.tiles["steam"].server
+        self.assertEqual(server.text(), "•••.•••.•••.•••")
+        with patch.object(app_module, "public_ip", return_value="203.0.113.7") as lookup:
+            server.toggle()
+            self.settle(lambda: server.text() == "203.0.113.7")
+            server.toggle()
+            self.assertEqual(server.text(), "203.0.•••.•••")
+        lookup.assert_called_once()
+
+    def test_an_unexpected_exit_from_the_vpn_is_announced(self):
+        controller = self.controller()
+        shown = []
+        controller.tray = type("Tray", (), {"showMessage": lambda self, *a: shown.append(a[1]),
+                                            "show_snapshot": lambda self, *a: None, "hide": lambda self: None,
+                                            "setContextMenu": lambda self, m: None, "deleteLater": lambda self: None,
+                                            "menu": type("M", (), {"deleteLater": lambda self: None})()})()
+        data = json.loads(self.state.read_text())
+        data["apps"][0]["state"] = "direct"
+        self.state.write_text(json.dumps(data))
+        controller.refresh()
+        self.settle(lambda: shown)
+        self.assertEqual(shown, ["vesktop left the VPN: now direct."])
+
+    def test_language_can_be_chosen_in_the_window(self):
+        from vpngo_gui import i18n
+        controller = self.controller()
+        self.addCleanup(setattr, i18n, "OVERRIDE", None)
+        old = controller.window
+        controller.change_setting("language", "pt-BR")
+        self.assertIsNot(controller.window, old)
+        self.assertEqual(controller.window.summary.label.text(), "1 de 3 na VPN")
+        self.assertEqual(set(controller.window.tiles), {"vesktop", "steam", "spotify"})
+        controller.change_setting("language", None)
+
+    def test_autostart_entry_runs_this_interface_hidden(self):
+        from vpngo_gui import autostart
+        autostart.set_enabled(True)
+        self.assertTrue(autostart.enabled())
+        text = autostart.linux_entry().read_text()
+        self.assertIn("run.py --hidden", text)
+        autostart.set_enabled(False)
+        self.assertFalse(autostart.enabled())
+
     def test_actions_run_the_matching_vpngo_commands(self):
         controller = self.controller()
         for name, action, argument in (("steam", "on", None), ("vesktop", "profile", "br"),
@@ -283,6 +412,9 @@ class WindowTest(FakeCli):
         app_dialog.submit()
         self.assertEqual(app_dialog.result(), app_dialog.DialogCode.Accepted)
         self.assertEqual(app_dialog.values()[2], "us")
+        app_dialog.once.setChecked(True)
+        self.assertFalse(app_dialog.start_now.isEnabled())
+        self.assertTrue(app_dialog.values()[4])
         profile_dialog = AddProfileDialog(["us"])
         conf = Path(self.directory.name) / "US.conf"
         conf.write_text("[Interface]\n")

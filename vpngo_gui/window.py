@@ -1,4 +1,4 @@
-"""The main window: one tile per app, lit by its route."""
+"""The main window: one tile per app, lit by its route, gathered under its group."""
 
 from html import escape
 
@@ -9,14 +9,20 @@ from PySide6.QtWidgets import (QGridLayout, QHBoxLayout, QLabel, QMenu, QPushBut
                                QVBoxLayout, QWidget)
 
 from . import theme
+from .appicons import app_icon
 from .i18n import tr
-from .stats import rate_text, split_endpoint, uptime_text
+from .stats import bytes_text, duration_text, rate_text, split_endpoint, uptime_text
 from .widgets import (ElidedLabel, IconButton, PillButton, Rates, RouteSwitch, ServerLabel, StateDot, TotalRate,
                       icon, rounded)
 
 
 TILE_HEIGHT = 196
+LARGE_HEIGHT = 330      # A tile with room for its whole story: few apps get these.
 TILE_MIN_WIDTH = 210
+LARGE_MIN_WIDTH = 460
+SLIM_HEIGHT = 56        # The add tile under large tiles: a line, not another card.
+HEADER_HEIGHT = 46
+FEW = 2                 # Up to this many apps, each tile opens into the detail view.
 SIDE = 7     # Room beside each tile; two of them make the 14px column gap.
 TOP = 2      # Room above; with BELOW it makes the 22px row gap.
 BELOW = 20   # Room below for the long soft shadow.
@@ -24,6 +30,28 @@ BELOW = 20   # Room below for the long soft shadow.
 
 def state_color(state):
     return {"vpn": theme.VPN, "partial": theme.WARN}.get(state, theme.MUTED)
+
+
+def route_texts(app):
+    """(top-row text, tooltip, short text): time on the current route, and on the other one in total."""
+    if not app.running:
+        return "", "", ""
+    since = app.route_since or app.started_at
+    current = uptime_text(since)
+    other = "direct" if app.state == "vpn" else "vpn" if app.state == "direct" else None
+    other_seconds = (app.direct_seconds if other == "direct" else app.vpn_seconds) if other else None
+    text = current
+    if other_seconds and other_seconds >= 60:
+        text += f"  ·  {tr('state_' + other)} {duration_text(other_seconds)}"
+    lines = [tr({"vpn": "on_vpn_for", "direct": "direct_for"}.get(app.state, "partial_for"), time=current)]
+    if app.vpn_seconds is not None:
+        lines += [tr("total_vpn", time=duration_text(app.vpn_seconds)),
+                  tr("total_direct", time=duration_text(app.direct_seconds))]
+    if app.started_at:
+        lines.append(tr("open_for", time=uptime_text(app.started_at)))
+    if not since:
+        return "", "", ""
+    return text, "\n".join(lines), current
 
 
 class Light:
@@ -52,6 +80,7 @@ class Tile(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.large = False
         self.setFixedHeight(TILE_HEIGHT + TOP + BELOW)
         self.setMinimumWidth(TILE_MIN_WIDTH + 2 * SIDE)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -60,10 +89,22 @@ class Tile(QWidget):
         self.alive.value = 1.0
         self.warn = 0.0
         self.hover = 0.0
-        self.history = ()   # Recent total rates, oldest first: drawn as the tile's traffic trace.
+        self.history = ()   # (total rate, route) samples, oldest first: drawn as the tile's traffic trace.
+
+    def set_large(self, large):
+        if large != self.large:
+            self.large = large
+            self.setFixedHeight((LARGE_HEIGHT if large else TILE_HEIGHT) + TOP + BELOW)
+            self.setMinimumWidth((LARGE_MIN_WIDTH if large else TILE_MIN_WIDTH) + 2 * SIDE)
+            self.update()
 
     def card_rect(self):
         return QRectF(self.rect()).adjusted(SIDE, TOP, -SIDE, -BELOW)
+
+    def trace_band(self, card):
+        """Between the top row and the app name, so the trace never runs under text."""
+        bottom = card.height() - 176 if self.large else card.height() * .5
+        return QRectF(card.left() + 1, card.top() + 44, card.width() - 2, bottom - 44)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -91,47 +132,60 @@ class Tile(QWidget):
             border = theme.mix(border.name(), theme.MUTED if not strength else accent, .25 * self.hover)
         painter.setPen(QPen(border, 1))
         painter.drawPath(rounded(card.adjusted(.5, .5, -.5, -.5), 14))
-        self._paint_trace(painter, card, theme.mix(theme.MUTED, accent, strength).name())
+        self._paint_trace(painter, card)
         painter.setPen(QPen(QColor(255, 255, 255, int(9 * alive)), 1))
         painter.drawLine(QPointF(card.left() + 14, card.top() + 1.5), QPointF(card.right() - 14, card.top() + 1.5))
 
-    def _paint_trace(self, painter, card, color):
-        """The last two minutes of traffic as a faint area behind the text, in the route's color."""
-        from .stats import HISTORY, QUIET
-        samples = list(self.history)
-        # Half a window of history before drawing, and nothing for an idle app: a flat line reads as a divider.
-        if len(samples) < HISTORY // 2 or self.alive.value < .5 or max(samples) < QUIET:
+    def _paint_trace(self, painter, card):
+        """Recent traffic as a faint area behind the text: green where it went through the VPN,
+        grey where it went direct, amber where the route was incomplete."""
+        from .stats import HISTORY, LONG_HISTORY, QUIET
+        span = LONG_HISTORY if self.large else HISTORY
+        samples = list(self.history)[-span:]
+        values = [value for value, _ in samples]
+        # Half a tile's window of history before drawing, and nothing for an idle app: a flat line reads as a divider.
+        if len(samples) < HISTORY // 2 or self.alive.value < .5 or max(values) < QUIET:
             return
-        peak = max(max(samples), QUIET * 4)
-        # Between the top row and the app name, so the trace never runs under text.
-        band = QRectF(card.left() + 1, card.top() + 44, card.width() - 2, card.height() * .5 - 44)
-        step = band.width() / (HISTORY - 1)
+        peak = max(max(values), QUIET * 4)
+        band = self.trace_band(card)
+        step = band.width() / (span - 1)
         start = band.right() - step * (len(samples) - 1)
         points = [QPointF(start + index * step, band.bottom() - band.height() * min(1.0, value / peak))
-                  for index, value in enumerate(samples)]
-        area = QPainterPath(QPointF(points[0].x(), band.bottom()))
-        for point in points:
-            area.lineTo(point)
-        area.lineTo(QPointF(points[-1].x(), band.bottom()))
-        area.closeSubpath()
+                  for index, value in enumerate(values)]
+        runs, first = [], 0
+        for index in range(1, len(samples) + 1):
+            if index == len(samples) or samples[index][1] != samples[first][1]:
+                runs.append((samples[first][1], first, index - 1))
+                first = index
         painter.save()
         painter.setClipPath(rounded(card, 14))
-        fade = QLinearGradient(band.topLeft(), band.bottomLeft())
-        fade.setColorAt(0, theme.color(color, .10))
-        fade.setColorAt(1, theme.color(color, 0))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(fade)
-        painter.drawPath(area)
-        line = QPainterPath(points[0])
-        for point in points[1:]:
-            line.lineTo(point)
-        # The oldest end fades in, so a trace that has not filled the band yet has no hard start.
-        stroke = QLinearGradient(QPointF(points[0].x(), 0), QPointF(points[0].x() + 40, 0))
-        stroke.setColorAt(0, theme.color(color, 0))
-        stroke.setColorAt(1, theme.color(color, .32))
-        painter.setPen(QPen(stroke, 1.2))
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawPath(line)
+        for state, first, last in runs:
+            color = state_color(state)
+            # Each stretch starts at the previous one's last point, so the line never breaks.
+            stretch = points[max(0, first - 1):last + 1]
+            if len(stretch) < 2:
+                continue
+            area = QPainterPath(QPointF(stretch[0].x(), band.bottom()))
+            for point in stretch:
+                area.lineTo(point)
+            area.lineTo(QPointF(stretch[-1].x(), band.bottom()))
+            area.closeSubpath()
+            fade = QLinearGradient(band.topLeft(), band.bottomLeft())
+            fade.setColorAt(0, theme.color(color, .10))
+            fade.setColorAt(1, theme.color(color, 0))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(fade)
+            painter.drawPath(area)
+            line = QPainterPath(stretch[0])
+            for point in stretch[1:]:
+                line.lineTo(point)
+            # The oldest end fades in, so a trace that has not filled the band yet has no hard start.
+            stroke = QLinearGradient(QPointF(points[0].x(), 0), QPointF(points[0].x() + 40, 0))
+            stroke.setColorAt(0, theme.color(color, 0))
+            stroke.setColorAt(1, theme.color(color, .32))
+            painter.setPen(QPen(stroke, 1.2))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawPath(line)
         painter.restore()
 
     def enterEvent(self, event):
@@ -145,6 +199,47 @@ class Tile(QWidget):
         super().leaveEvent(event)
 
 
+class Facts(QWidget):
+    """The detail view's figures: time on this route, on each route in total, and the data it moved."""
+
+    KEYS = ("fact_route", "fact_vpn", "fact_direct", "fact_data")
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        grid = QGridLayout(self)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(3)
+        self.values = []
+        for column, key in enumerate(self.KEYS):
+            caption = QLabel(tr(key))
+            caption.setFont(theme.font(12))
+            caption.setStyleSheet(f"color: {theme.MUTED};")
+            value = ElidedLabel()
+            value.setFont(theme.font(13, mono=True))
+            value.setStyleSheet(f"color: {theme.TEXT};")
+            value.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            grid.addWidget(caption, 0, column)
+            grid.addWidget(value, 1, column)
+            grid.setColumnStretch(column, 2 if key == "fact_data" else 1)
+            self.values.append(value)
+        self.setFixedHeight(40)
+
+    def set_app(self, app):
+        since = app.route_since or app.started_at
+        data = ""
+        if app.route_rx_bytes is not None:
+            data = f"↓ {bytes_text(app.route_rx_bytes)} ↑ {bytes_text(app.route_tx_bytes or 0)}"
+        texts = (uptime_text(since) if app.running and since else "—",
+                 duration_text(app.vpn_seconds) if app.vpn_seconds is not None else "—",
+                 duration_text(app.direct_seconds) if app.direct_seconds is not None else "—",
+                 data or "—")
+        for label, text in zip(self.values, texts):
+            if label.text() != text:
+                label.setText(text)
+                label.setToolTip("")
+
+
 class AppTile(Tile):
     action = Signal(str, str, object)  # app name, action, argument
 
@@ -153,6 +248,8 @@ class AppTile(Tile):
         self.name = app.name
         self.app = None
         self.profiles = ()
+        self.groups = ()
+        self.platform = ""
         self.busy = False
         outer = QVBoxLayout(self)
         outer.setContentsMargins(SIDE + 18, TOP + 14, SIDE + 14, BELOW + 16)
@@ -180,6 +277,10 @@ class AppTile(Tile):
 
         heading = QHBoxLayout()
         heading.setSpacing(10)
+        self.icon = QLabel()
+        self.icon.setFixedSize(24, 24)
+        self.icon.hide()
+        heading.addWidget(self.icon, 0, Qt.AlignmentFlag.AlignVCenter)
         self.title = ElidedLabel(self.name)
         self.title.setFont(theme.font(20, QFont.Weight.DemiBold))
         self.title.setStyleSheet(f"color: {theme.TEXT}; letter-spacing: -0.2px;")
@@ -193,12 +294,18 @@ class AppTile(Tile):
         stats.setSpacing(10)
         self.server = ServerLabel()
         self.server.revealed_changed.connect(lambda _: self._sync_compact())
+        self.server.lookup_requested.connect(lambda: self.action.emit(self.name, "lookup", None))
         stats.addWidget(self.server)
         stats.addStretch()
         self.total = TotalRate()  # Narrow tiles: the combined rate sits here instead of beside the name.
         self.total.hide()
         stats.addWidget(self.total)
         outer.addLayout(stats)
+        self.facts = Facts()
+        self.facts_gap = outer.count()
+        outer.addSpacing(0)
+        outer.addWidget(self.facts)
+        self.facts.hide()
         outer.addSpacing(6)
 
         row = QWidget()
@@ -222,8 +329,18 @@ class AppTile(Tile):
         outer.addWidget(row)
         self.update_app(app, (), animate=False)
 
-    def update_app(self, app, profiles, animate=True):
-        self.app, self.profiles = app, profiles
+    def set_large(self, large):
+        super().set_large(large)
+        self.facts.setVisible(large)
+        # Without the figures, their spacing would push the name up for nothing.
+        self.layout().itemAt(self.facts_gap).spacerItem().changeSize(0, 14 if large else 0)
+        self.layout().invalidate()
+
+    def update_app(self, app, profiles, groups=(), platform="", manages=False, animate=True):
+        """manages: vpngo can group and remove apps (0.7.0 and later)."""
+        first = self.app is None
+        self.app, self.profiles, self.groups, self.platform = app, profiles, groups, platform
+        self.manages = manages
         running = app.running
         self.dot.set_state(state_color(app.state), hollow=not running, animate=animate)
         self.light.go(1.0 if app.state == "vpn" else 0.0, animate)
@@ -233,21 +350,40 @@ class AppTile(Tile):
         self.start.setVisible(not running)
         if running:
             self.switch.set_checked_quietly(app.state in {"vpn", "partial"})
-        self.title.setStyleSheet(f"color: {theme.TEXT if running else theme.mix(theme.TEXT, theme.BG, .4).name()};"
-                                 " letter-spacing: -0.2px;")
+        dim = theme.mix(theme.TEXT, theme.BG, .4).name()
+        self.title.setStyleSheet(f"color: {theme.TEXT if running else dim}; letter-spacing: -0.2px;")
+        if first or app.executable != getattr(self, "_executable", None):
+            self._executable = app.executable
+            found = app_icon(app.name, app.executable)
+            self.icon.setVisible(found is not None)
+            if found is not None:
+                self.icon.setPixmap(found.pixmap(QSize(24, 24), self.devicePixelRatioF()))
+        self.icon.setEnabled(running)
         self._show_detail()
         self.switch.setToolTip(tr("vpn_off") if self.switch.isChecked() else tr("vpn_on"))
-        # A direct route does not leave through the VPN server, so its address would mislead there.
-        through_vpn = app.state in {"vpn", "partial"}
-        self.server.set_endpoint(*(split_endpoint(app.endpoint) if through_vpn else (None, None)))
-        self.uptime.setText(uptime_text(app.started_at) if running else "")
-        self.uptime.setToolTip(f"{tr('uptime_tip')} {uptime_text(app.started_at)}" if running and app.started_at else "")
+        # A direct route does not leave through the VPN server: there the line is the public IP instead.
+        if app.state in {"vpn", "partial"}:
+            self.server.set_endpoint(*split_endpoint(app.endpoint))
+        elif app.state == "direct":
+            self.server.set_public(getattr(self, "public_ip", None))
+        else:
+            self.server.set_endpoint(None, None)
+        self.route_text = route_texts(app)
+        self._fit_route_text()
+        self.facts.set_app(app)
         if not running:
             self.set_traffic(None, ())
         self.update()
 
+    def set_public_ip(self, address, failed=False):
+        self.public_ip = address
+        if failed:
+            self.server.lookup_failed()
+        elif self.app and self.app.state == "direct":
+            self.server.set_public(address)
+
     def set_traffic(self, rates, history):
-        """rates: (down, up) bytes per second or None; history: recent totals for the trace."""
+        """rates: (down, up) bytes per second or None; history: recent (total, route) samples for the trace."""
         self.history = tuple(history)
         if rates is None:
             self.rates.set_rates("", "")
@@ -260,6 +396,15 @@ class AppTile(Tile):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._sync_compact()
+        self._fit_route_text()
+
+    def _fit_route_text(self):
+        """The other route's total only when it fits whole; a cut figure is worse than none."""
+        text, tip, short = getattr(self, "route_text", ("", "", ""))
+        if self.uptime.fontMetrics().horizontalAdvance(text) > self.uptime.width():
+            text = short
+        self.uptime.setText(text)
+        self.uptime.setToolTip(tip)
 
     def _sync_compact(self):
         """Below a 260px card the rates collapse to one total beside the server line; a revealed
@@ -291,15 +436,49 @@ class AppTile(Tile):
     def _fill_menu(self):
         self.menu.clear()
         app = self.app
+        emit = self.action.emit
         if app.running:
-            self.menu.addAction(tr("restart"), lambda: self.action.emit(self.name, "start", None))
-            self.menu.addAction(tr("stop"), lambda: self.action.emit(self.name, "stop", None))
+            self.menu.addAction(tr("restart"), lambda: emit(self.name, "start", None))
+            self.menu.addAction(tr("stop"), lambda: emit(self.name, "stop", None))
         else:
-            self.menu.addAction(tr("start"), lambda: self.action.emit(self.name, "start", None))
+            self.menu.addAction(tr("start"), lambda: emit(self.name, "start", None))
         if self.profiles:
             self.menu.addSeparator()
-            add_profiles(self.menu, self.profiles, app.shown_profile,
-                         lambda p: self.action.emit(self.name, "profile", p))
+            add_profiles(self.menu, self.profiles, app.shown_profile, lambda p: emit(self.name, "profile", p))
+        if self.manages:
+            self.menu.addSeparator()
+            self._fill_group_menu(self.menu.addMenu(tr("group_menu")))
+        if self.platform.startswith("linux"):
+            # Linux only: the other systems cannot enforce either safeguard per app.
+            self.menu.addSeparator()
+            header = self.menu.addAction(tr("protection"))
+            header.setEnabled(False)
+            killswitch = QAction(tr("killswitch"), self.menu, checkable=True, checked=app.killswitch)
+            killswitch.setEnabled(not app.dns)  # DNS isolation depends on it.
+            killswitch.triggered.connect(lambda on: emit(self.name, "policy", ("killswitch", on)))
+            self.menu.addAction(killswitch)
+            dns = QAction(tr("dns_isolation"), self.menu, checkable=True, checked=app.dns)
+            dns.setEnabled(app.killswitch)
+            dns.triggered.connect(lambda on: emit(self.name, "policy", ("dns", on)))
+            self.menu.addAction(dns)
+        if self.manages and not app.running:
+            self.menu.addSeparator()
+            self.menu.addAction(tr("remove_app"), lambda: emit(self.name, "remove", None))
+
+    def _fill_group_menu(self, groups):
+        app, emit = self.app, self.action.emit
+        choice = QActionGroup(groups)
+        for group in self.groups:
+            item = QAction(group, groups, checkable=True)
+            item.setChecked(group == app.group)
+            item.triggered.connect(lambda _=False, g=group: g != app.group and emit(self.name, "group_join", g))
+            choice.addAction(item)
+            groups.addAction(item)
+        if self.groups:
+            groups.addSeparator()
+        groups.addAction(tr("group_new"), lambda: emit(self.name, "group_new", None))
+        if app.group:
+            groups.addAction(tr("group_leave"), lambda: emit(self.name, "group_leave", app.group))
 
 
 def add_profiles(menu, profiles, current, choose):
@@ -315,18 +494,94 @@ def add_profiles(menu, profiles, current, choose):
         menu.addAction(item)
 
 
+class GroupHeader(QWidget):
+    """A group's name over its tiles, with one switch for all of them. Without a name: the other apps."""
+
+    action = Signal(str, str, object)  # group, action, argument
+
+    def __init__(self, name=None, parent=None):
+        super().__init__(parent)
+        self.name = name
+        self.busy = None
+        self.apps = ()
+        self.profiles = ()
+        self.setFixedHeight(HEADER_HEIGHT)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(SIDE, 12, SIDE + 4, 4)
+        layout.setSpacing(10)
+        self.title = QLabel(name or tr("group_other"))
+        self.title.setFont(theme.font(14, QFont.Weight.DemiBold))
+        self.title.setStyleSheet(f"color: {theme.TEXT if name else theme.MUTED};")
+        layout.addWidget(self.title)
+        self.count = QLabel()
+        self.count.setFont(theme.font(12, mono=True))
+        self.count.setStyleSheet(f"color: {theme.MUTED};")
+        layout.addWidget(self.count)
+        layout.addStretch()
+        self.switch = RouteSwitch()
+        self.switch.clicked.connect(lambda checked: self.action.emit(self.name, "on" if checked else "off", None))
+        self.more = IconButton("more", name or "")
+        self.menu = QMenu(self.more)
+        self.more.setMenu(self.menu)
+        self.menu.aboutToShow.connect(self._fill_menu)
+        layout.addWidget(self.switch)
+        layout.addWidget(self.more)
+        self.switch.setVisible(bool(name))
+        self.more.setVisible(bool(name))
+        self.count.setVisible(bool(name))
+
+    def update_group(self, apps, profiles):
+        self.apps, self.profiles = tuple(apps), profiles
+        on = sum(1 for app in apps if app.state == "vpn")
+        if not self.busy:
+            self.count.setText(tr("group_count", on=on, total=len(apps)))
+        self.switch.set_checked_quietly(bool(apps) and on == len(apps))
+        self.switch.setToolTip(tr("group_off") if self.switch.isChecked() else tr("group_on"))
+
+    def set_busy(self, label):
+        self.busy = label
+        for control in (self.switch, self.more):
+            control.setEnabled(not label)
+        if label:
+            self.count.setText(label)
+        else:
+            self.update_group(self.apps, self.profiles)
+
+    def _fill_menu(self):
+        self.menu.clear()
+        emit = self.action.emit
+        self.menu.addAction(tr("group_on"), lambda: emit(self.name, "on", None))
+        self.menu.addAction(tr("group_off"), lambda: emit(self.name, "off", None))
+        self.menu.addAction(tr("group_stop"), lambda: emit(self.name, "stop", None))
+        if self.profiles:
+            self.menu.addSeparator()
+            shared = {app.shown_profile for app in self.apps}
+            add_profiles(self.menu, self.profiles, shared.pop() if len(shared) == 1 else None,
+                         lambda p: emit(self.name, "switch", p))
+        self.menu.addSeparator()
+        self.menu.addAction(tr("group_delete"), lambda: emit(self.name, "delete", None))
+
+
 class AddTile(QWidget):
     clicked = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(TILE_HEIGHT + TOP + BELOW)
-        self.setMinimumWidth(TILE_MIN_WIDTH + 2 * SIDE)
+        self.slim = None
+        self.set_slim(False)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAccessibleName(tr("add_app"))
         self.hover = False
+
+    def set_slim(self, slim):
+        """Under large tiles the add tile is a single line across the board."""
+        if slim != self.slim:
+            self.slim = slim
+            self.setFixedHeight((SLIM_HEIGHT if slim else TILE_HEIGHT) + TOP + BELOW)
+            self.setMinimumWidth(TILE_MIN_WIDTH + 2 * SIDE)
+            self.update()
 
     def enterEvent(self, event):
         self.hover = True
@@ -412,7 +667,7 @@ class EmptyState(QWidget):
 
 
 class MessageBar(QWidget):
-    """Result line floating at the bottom; errors stay until dismissed."""
+    """Result line floating at the bottom; errors and offers stay until dismissed."""
 
     shown = Signal()
     hidden = Signal()
@@ -427,11 +682,19 @@ class MessageBar(QWidget):
         self.text = QLabel()
         self.text.setWordWrap(True)
         self.text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.button = QPushButton()
+        self.button.setFixedHeight(28)
+        self.button.setStyleSheet("QPushButton { height: 28px; padding: 0 14px; border-radius: 14px; }")
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.button.hide()
+        self.button.clicked.connect(self._act)
+        self.callback = None
         self.close_button = IconButton("close", tr("dismiss"))
         self.close_button.setPopupMode(IconButton.ToolButtonPopupMode.DelayedPopup)
         self.close_button.clicked.connect(self.hide)
         layout.addWidget(self.dot, 0, Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self.text, 1)
+        layout.addWidget(self.button, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self.close_button, 0, Qt.AlignmentFlag.AlignTop)
         self.timer = QTimer(self, singleShot=True, interval=6000)
         self.timer.timeout.connect(self.hide)
@@ -441,14 +704,25 @@ class MessageBar(QWidget):
         super().hideEvent(event)
         self.hidden.emit()
 
-    def show_message(self, text, error):
+    def _act(self):
+        callback, self.callback = self.callback, None
+        self.hide()
+        if callback:
+            callback()
+
+    def show_message(self, text, error, action=None, callback=None):
+        """action names a button that runs callback; a message with one stays until answered."""
         self.error = error
+        self.callback = callback
         self.dot.set_state(theme.DANGER if error else theme.VPN, animate=False)
         self.text.setText(text)
+        self.button.setVisible(bool(action))
+        if action:
+            self.button.setText(action)
         self.show()
         self.shown.emit()
         self.update()
-        if error:
+        if error or action:
             self.timer.stop()
         else:
             self.timer.start()
@@ -494,7 +768,11 @@ class Summary(QWidget):
 
 
 class Board(QWidget):
-    """Lays the tiles out in as many columns as fit, moving tiles instead of rebuilding them."""
+    """Lays the tiles out in as many columns as fit, moving tiles instead of rebuilding them.
+
+    Items are (widget, wide) pairs: a wide item (a group header, the slim add tile) takes a
+    row of its own across every column.
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -504,6 +782,8 @@ class Board(QWidget):
         self.grid.setSpacing(0)
         self.grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.items = []
+        self.min_width = TILE_MIN_WIDTH
+        self.most = 4       # Never more columns than this: one large tile spans the whole board.
         self.columns = 0
 
     def set_bottom_inset(self, inset):
@@ -511,10 +791,11 @@ class Board(QWidget):
         margins = self.grid.contentsMargins()
         self.grid.setContentsMargins(margins.left(), margins.top(), margins.right(), self.base_bottom + inset)
 
-    def set_items(self, items):
-        if items == self.items:
+    def set_items(self, items, min_width=TILE_MIN_WIDTH, most=4):
+        if items == self.items and (min_width, most) == (self.min_width, self.most):
             return
         self.items = items
+        self.min_width, self.most = min_width, most
         self.columns = 0
         self.relayout()
 
@@ -522,23 +803,54 @@ class Board(QWidget):
         super().resizeEvent(event)
         self.relayout()
 
+    def columns_for(self, width):
+        return max(1, min(self.most, (width - 2 * (20 - SIDE)) // (self.min_width + 2 * SIDE)))
+
+    def content_height(self, width):
+        """The board's height at this width: what the window needs to show every tile."""
+        columns, height = self.columns_for(width), 4 + self.base_bottom
+        row = column = 0
+        for widget, wide in self.items:
+            if wide:
+                height += row + widget.minimumHeight()
+                row = column = 0
+                continue
+            row = max(row, widget.minimumHeight())
+            column += 1
+            if column == columns:
+                height += row
+                row = column = 0
+        return height + row
+
     def relayout(self):
-        usable = self.width() - 2 * (20 - SIDE)
-        columns = max(1, min(4, usable // (TILE_MIN_WIDTH + 2 * SIDE)))
-        if columns == self.columns and all(self.grid.indexOf(item) >= 0 for item in self.items):
+        columns = self.columns_for(self.width())
+        if columns == self.columns and all(self.grid.indexOf(widget) >= 0 for widget, _ in self.items):
             return
         self.columns = columns
         while self.grid.count():
             self.grid.takeAt(0)
         for column in range(4):
             self.grid.setColumnStretch(column, 1 if column < columns else 0)
-        for index, item in enumerate(self.items):
-            self.grid.addWidget(item, index // columns, index % columns)
-            item.show()
+        row = column = 0
+        for widget, wide in self.items:
+            if wide:
+                if column:
+                    row, column = row + 1, 0
+                self.grid.addWidget(widget, row, 0, 1, columns)
+                row += 1
+            else:
+                self.grid.addWidget(widget, row, column)
+                column += 1
+                if column == columns:
+                    row, column = row + 1, 0
+            widget.show()
 
 
 class Window(QWidget):
     app_action = Signal(str, str, object)
+    group_action = Signal(str, str, object)
+    profile_action = Signal(str, str)        # profile, action ("remove")
+    setting_changed = Signal(str, object)    # key, value
     add_app = Signal()
     add_profile = Signal()
     get_engine = Signal()
@@ -551,13 +863,15 @@ class Window(QWidget):
         self.setMinimumSize(QSize(300, 360))
         self.glow = Light(self, self.update)
         self.tiles = {}
+        self.headers = {}
+        self.settings = {}
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         bar = QHBoxLayout()
-        bar.setContentsMargins(20, 16, 20, 12)
+        bar.setContentsMargins(20, 16, 14, 12)
         bar.addStrut(34)  # Same height with or without the pills, so the wordmark never moves.
         bar.setSpacing(8)
         wordmark = QLabel("VPNGo")
@@ -572,11 +886,18 @@ class Window(QWidget):
         self.profiles_button.clicked.connect(lambda: self.profiles_menu.popup(
             self.profiles_button.mapToGlobal(self.profiles_button.rect().bottomLeft())))
         bar.addWidget(self.profiles_button)
+        self.settings_button = IconButton("sliders", tr("settings"))
+        self.settings_menu = QMenu(self.settings_button)
+        self.settings_button.setMenu(self.settings_menu)
+        self.settings_menu.aboutToShow.connect(self._fill_settings_menu)
+        bar.addSpacing(2)
+        bar.addWidget(self.settings_button, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addLayout(bar)
 
         self.board = Board()
         self.add_tile = AddTile()
         self.add_tile.clicked.connect(self.add_app)
+        self.other_header = GroupHeader()
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -598,7 +919,7 @@ class Window(QWidget):
             QShortcut(keys, self, activated=self.close)
         self.snapshot = None
         self.engine_missing = False
-        self._profiles = ()
+        self._profiles = None
         self._fill_profiles_menu(())
 
     def _empty_action(self):
@@ -609,15 +930,46 @@ class Window(QWidget):
         else:
             self.add_app.emit()
 
-    def _fill_profiles_menu(self, profiles):
+    def _fill_profiles_menu(self, profiles, manages=False):
         self.profiles_menu.clear()
         for profile in profiles:
-            item = self.profiles_menu.addAction(profile)
-            item.setFont(theme.font(13, mono=True))
-            item.setEnabled(False)
+            if manages:
+                item = self.profiles_menu.addMenu(profile)
+                item.menuAction().setFont(theme.font(13, mono=True))
+                item.addAction(tr("remove_profile"), lambda _=False, p=profile: self.profile_action.emit(p, "remove"))
+            else:
+                item = self.profiles_menu.addAction(profile)
+                item.setFont(theme.font(13, mono=True))
+                item.setEnabled(False)
         if profiles:
             self.profiles_menu.addSeparator()
         self.profiles_menu.addAction(tr("add_profile"), self.add_profile.emit)
+
+    def set_settings(self, settings):
+        """language (None follows the system), autostart, notify, version, update (a newer version or None)."""
+        self.settings = dict(settings)
+
+    def _fill_settings_menu(self):
+        menu, settings, emit = self.settings_menu, self.settings, self.setting_changed.emit
+        menu.clear()
+        languages = menu.addMenu(tr("language"))
+        choice = QActionGroup(languages)
+        for code, label in ((None, tr("language_auto")), ("pt-BR", "Português (Brasil)"), ("en-US", "English")):
+            item = QAction(label, languages, checkable=True, checked=settings.get("language") == code)
+            item.triggered.connect(lambda _=False, c=code: emit("language", c))
+            choice.addAction(item)
+            languages.addAction(item)
+        for key in ("autostart", "notify"):
+            item = QAction(tr(key), menu, checkable=True, checked=bool(settings.get(key)))
+            item.triggered.connect(lambda on, k=key: emit(k, on))
+            menu.addAction(item)
+        menu.addSeparator()
+        version = menu.addAction(tr("version", version=settings.get("version", "")))
+        version.setEnabled(False)
+        if settings.get("update"):
+            menu.addAction(tr("update_to", version=settings["update"]), lambda: emit("update", True))
+        elif settings.get("version") not in (None, "", "dev"):
+            menu.addAction(tr("check_updates"), lambda: emit("check_updates", True))
 
     def show_unavailable(self, text):
         self.engine_missing = False
@@ -638,6 +990,14 @@ class Window(QWidget):
         self.empty.button.setEnabled(not downloading)
         self.empty.show()
 
+    def _tile(self, app):
+        tile = self.tiles.get(app.name)
+        if tile is None:
+            tile = AppTile(app)
+            tile.action.connect(self.app_action)
+            self.tiles[app.name] = tile
+        return tile
+
     def show_snapshot(self, snapshot, animate=True):
         self.engine_missing = False
         self.empty.button.setEnabled(True)
@@ -645,21 +1005,45 @@ class Window(QWidget):
         first = self.snapshot is None
         self.snapshot = snapshot
         animate = animate and not first
-        if first or snapshot.profiles != self._profiles:
-            self._profiles = snapshot.profiles
-            self._fill_profiles_menu(snapshot.profiles)
-        names = [app.name for app in snapshot.apps]
+        if (snapshot.profiles, snapshot.manages) != self._profiles:
+            self._profiles = (snapshot.profiles, snapshot.manages)
+            self._fill_profiles_menu(snapshot.profiles, snapshot.manages)
+        by_name = {app.name: app for app in snapshot.apps}
         for name in list(self.tiles):
-            if name not in names:
+            if name not in by_name:
                 self.tiles.pop(name).deleteLater()
+        large = 0 < len(snapshot.apps) <= FEW
+        group_names = tuple(name for name, _ in snapshot.groups)
+        items, grouped = [], set()
+        for group, members in snapshot.groups:
+            apps = [by_name[name] for name in members if name in by_name]
+            if not apps:
+                continue
+            header = self.headers.get(group)
+            if header is None:
+                header = self.headers[group] = GroupHeader(group)
+                header.action.connect(self.group_action)
+            header.update_group(apps, snapshot.profiles)
+            items.append((header, True))
+            items += [(self._tile(app), False) for app in apps]
+            grouped.update(app.name for app in apps)
+        shown = {id(widget) for widget, _ in items}
+        for group in list(self.headers):
+            if id(self.headers[group]) not in shown:
+                self.headers.pop(group).deleteLater()
+        rest = [app for app in snapshot.apps if app.name not in grouped]
+        if grouped and rest:
+            items.append((self.other_header, True))
+        items += [(self._tile(app), False) for app in rest]
         for app in snapshot.apps:
-            tile = self.tiles.get(app.name)
-            if tile is None:
-                tile = AppTile(app)
-                tile.action.connect(self.app_action)
-                self.tiles[app.name] = tile
-            tile.update_app(app, snapshot.profiles, animate=animate)
-        self.board.set_items([self.tiles[name] for name in names] + [self.add_tile])
+            tile = self.tiles[app.name]
+            tile.set_large(large)
+            tile.update_app(app, snapshot.profiles, group_names, snapshot.platform, snapshot.manages, animate=animate)
+        self.add_tile.set_slim(large)
+        items.append((self.add_tile, large))
+        self.other_header.setVisible(bool(grouped and rest))
+        self.board.set_items(items, LARGE_MIN_WIDTH if large else TILE_MIN_WIDTH,
+                             len(snapshot.apps) if large else 4)
         self.summary.set_counts(snapshot.on_vpn, len(snapshot.apps))
         self.glow.go(1.0 if snapshot.on_vpn else 0.0, animate)
         if not snapshot.profiles and not snapshot.apps:
@@ -674,15 +1058,36 @@ class Window(QWidget):
             self.empty.hide()
             self.scroll.show()
 
+    def fit_to_content(self):
+        """Open as tall as the tiles need (within the screen), instead of a mostly empty window."""
+        if self.snapshot is None or not self.snapshot.apps:
+            return
+        area = self.screen().availableGeometry() if self.screen() else QRectF(0, 0, 1280, 900).toRect()
+        width = self.width()
+        apps = len(self.snapshot.apps)
+        if 1 < apps <= FEW:
+            # Side by side rather than stacked: a pair of detail tiles reads as a comparison.
+            width = max(width, min(int(area.width() * .9), apps * (LARGE_MIN_WIDTH + 2 * SIDE) + 2 * (20 - SIDE)))
+        bar = 62
+        height = bar + self.board.content_height(width) + 12
+        self.resize(width, max(self.minimumHeight(), min(int(area.height() * .85), height)))
+
     def set_traffic(self, rates, history):
         for name, tile in self.tiles.items():
             tile.set_traffic(rates.get(name), history.get(name, ()))
 
+    def set_public_ip(self, address, failed=False):
+        for tile in self.tiles.values():
+            tile.set_public_ip(address, failed)
+
     def set_busy(self, labels):
-        """labels maps an app name to the action in progress."""
+        """labels maps an app name, or "group:<name>", to the action in progress."""
         for name, tile in self.tiles.items():
             if tile.busy != labels.get(name):
                 tile.set_busy(labels.get(name))
+        for name, header in self.headers.items():
+            if header.busy != labels.get("group:" + name):
+                header.set_busy(labels.get("group:" + name))
 
     def paintEvent(self, event):
         painter = QPainter(self)

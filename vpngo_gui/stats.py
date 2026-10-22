@@ -1,18 +1,26 @@
 """Turn vpngo's cumulative counters into rates, history and readable text."""
 
 import ipaddress
+import json
+import os
 import time
 from collections import deque
 
 from .i18n import language, tr
 
 
-HISTORY = 40        # Samples kept per app: about two minutes at the 3 s refresh.
+HISTORY = 40        # Samples a tile draws: about two minutes at the 3 s refresh.
+LONG_HISTORY = 200  # Samples kept per app, about ten minutes: the detail view draws them all.
 QUIET = 4 * 1024    # Rates below this still draw a flat line, not a noisy one.
+RESUME = 120        # Seconds a saved history stays good: covers a restart, not a day off.
 
 
 class Traffic:
-    """Per-app byte rates from successive snapshots; resets when a counter goes backwards."""
+    """Per-app byte rates from successive snapshots; resets when a counter goes backwards.
+
+    history maps an app to (total rate, route state) samples, oldest first, so the trace
+    can show which stretch went through the VPN and which went direct.
+    """
 
     def __init__(self):
         self.last = {}
@@ -28,17 +36,51 @@ class Traffic:
                 continue
             previous = self.last.get(app.name)
             self.last[app.name] = (now, app.rx_bytes, app.tx_bytes)
-            history = self.history.setdefault(app.name, deque(maxlen=HISTORY))
+            history = self.history.setdefault(app.name, deque(maxlen=LONG_HISTORY))
             if previous is None or now <= previous[0]:
                 continue
             elapsed = now - previous[0]
             down, up = app.rx_bytes - previous[1], app.tx_bytes - previous[2]
-            if down < 0 or up < 0:  # New session or closed connections: start over.
-                history.clear()
+            if down < 0 or up < 0:  # Closed connections (Mihomo) restart the counters: skip one sample.
                 continue
             rates[app.name] = (down / elapsed, up / elapsed)
-            history.append(down / elapsed + up / elapsed)
+            history.append((down / elapsed + up / elapsed, app.state))
         return rates
+
+    def save(self, path):
+        data = {"saved_at": time.time(),
+                "apps": {name: [list(sample) for sample in samples] for name, samples in self.history.items()}}
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(data), encoding="utf-8")
+            os.replace(temporary, path)
+        except OSError:
+            pass
+
+    def load(self, path):
+        """Pick up the trace from a recent run (an update or a quick restart)."""
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if time.time() - float(data["saved_at"]) > RESUME:
+                return
+            for name, samples in data["apps"].items():
+                self.history[str(name)] = deque(((float(value), str(state)) for value, state in samples),
+                                                maxlen=LONG_HISTORY)
+        except (OSError, ValueError, KeyError, TypeError):
+            self.history.clear()
+
+
+def bytes_text(value):
+    units = ("B", "kB", "MB", "GB", "TB")
+    index = 0
+    while value >= 1000 and index < len(units) - 1:
+        value /= 1000
+        index += 1
+    text = f"{value:.0f}" if value >= 10 or index == 0 else f"{value:.1f}"
+    if language() == "pt-BR":
+        text = text.replace(".", ",")
+    return f"{text} {units[index]}"
 
 
 def rate_text(value):
@@ -53,10 +95,8 @@ def rate_text(value):
     return f"{text} {units[index]}"
 
 
-def uptime_text(started_at, now=None):
-    if not started_at:
-        return ""
-    seconds = max(0, int((time.time() if now is None else now) - started_at))
+def duration_text(seconds):
+    seconds = max(0, int(seconds or 0))
     minutes, hours, days = seconds // 60, seconds // 3600, seconds // 86400
     if minutes < 1:
         return tr("uptime_now")
@@ -65,6 +105,12 @@ def uptime_text(started_at, now=None):
     if days < 1:
         return f"{hours} h {minutes % 60:02d} min"
     return f"{days} d {hours % 24} h"
+
+
+def uptime_text(started_at, now=None):
+    if not started_at:
+        return ""
+    return duration_text((time.time() if now is None else now) - started_at)
 
 
 def split_endpoint(endpoint):

@@ -40,7 +40,10 @@ v1 scope (confirmed):
 - Tray icon with quick actions per app; closing the window keeps the tray.
 - Language: pt-BR and English, following the system language and `VPNGO_LANG`, like the CLI.
 
-Out of v1 (stay in the CLI): kill switch and DNS policies, helpers, temporary runs, Windows `shutdown`.
+- Asked for on 2026-10-22 (second round): time on the current route and on each route in total instead of time since the app opened; the traffic trace coloured by route; the public IP on the direct route (looked up only on click); a detail view so one or two apps do not leave the window bare; groups that turn several apps on or off at once; each app's own icon; removing apps and profiles; kill switch and DNS policy (Linux); running a program once ("só desta vez"); start with the system; a notice when an app leaves the VPN on its own; update checks; choosing the language.
+- The app icon is the owner's vpngo mark from the owner's GitHub profile: a dot splitting into a green (VPN), an amber and a dotted grey (direct) path.
+
+Out of scope (stay in the CLI): helpers and Windows `shutdown`.
 
 Terms come from the CLI: profile, app, start, stop, on, off, switch.
 

@@ -15,7 +15,7 @@ def tray_icon(on):
     """The app mark, its route lit only while some app is on the VPN."""
     svg = (theme.ASSETS / "vpngo.svg").read_text(encoding="utf-8")
     if not on:
-        svg = svg.replace(theme.VPN, theme.MUTED)
+        svg = svg.replace(theme.VPN, theme.MUTED).replace(theme.WARN, theme.MUTED)
     renderer = QSvgRenderer(QByteArray(svg.encode()))
     result = QIcon()
     for size in (16, 22, 24, 32, 48, 64):
@@ -31,6 +31,7 @@ def tray_icon(on):
 
 class Tray(QSystemTrayIcon):
     app_action = Signal(str, str, object)
+    group_action = Signal(str, str, object)
     open_window = Signal()
     quit = Signal()
 
@@ -72,6 +73,15 @@ class Tray(QSystemTrayIcon):
         self.menu.clear()
         snapshot = self.snapshot
         if snapshot is not None:
+            by_name = {app.name: app for app in snapshot.apps}
+            grouped = False
+            for group, members in snapshot.groups:
+                apps = [by_name[name] for name in members if name in by_name]
+                if apps:
+                    self.menu.addMenu(self._group_menu(group, apps))
+                    grouped = True
+            if grouped:
+                self.menu.addSeparator()
             for app in snapshot.apps:
                 self.menu.addMenu(self._app_menu(app, snapshot.profiles))
             if snapshot.apps:
@@ -79,10 +89,21 @@ class Tray(QSystemTrayIcon):
         self.menu.addAction(tr("open"), self.open_window.emit)
         self.menu.addAction(tr("quit"), self.quit.emit)
 
+    def _group_menu(self, group, apps):
+        on = sum(1 for app in apps if app.state == "vpn")
+        busy = self.busy.get("group:" + group)
+        menu = QMenu(f"{group}    {busy or tr('group_count', on=on, total=len(apps))}", self.menu)
+        menu.setEnabled(not busy)
+        emit = self.group_action.emit
+        for action in ("on", "off", "stop"):
+            menu.addAction(tr("group_" + action), lambda _=False, a=action: emit(group, a, None))
+        return menu
+
     def _app_menu(self, app, profiles):
         state = f"{app.shown_profile} · {self.busy.get(app.name) or tr('state_' + app.state)}"
-        if app.running and app.started_at and app.name not in self.busy:
-            state += f" · {uptime_text(app.started_at)}"
+        since = app.route_since or app.started_at
+        if app.running and since and app.name not in self.busy:
+            state += f" · {uptime_text(since)}"
         menu = QMenu(f"{app.name}    {state}", self.menu)
         menu.setEnabled(app.name not in self.busy)
         emit = self.app_action.emit

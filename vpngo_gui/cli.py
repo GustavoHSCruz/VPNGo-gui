@@ -29,6 +29,15 @@ class App:
     endpoint: str | None = None
     rx_bytes: int | None = None
     tx_bytes: int | None = None
+    route_since: float | None = None      # When the current route (VPN or direct) began.
+    vpn_seconds: int | None = None        # Time on each route since the app started.
+    direct_seconds: int | None = None
+    route_rx_bytes: int | None = None     # Traffic since the current route began.
+    route_tx_bytes: int | None = None
+    executable: str | None = None
+    group: str | None = None
+    killswitch: bool = False
+    dns: bool = False
 
     @property
     def running(self):
@@ -45,6 +54,8 @@ class Snapshot:
     apps: tuple = ()
     platform: str = field(default=sys.platform)
     version: str = ""
+    groups: tuple = ()      # (name, (app, ...)) in vpngo's order.
+    manages: bool = False   # vpngo 0.7.0+: groups, and removing apps and profiles.
 
     @property
     def on_vpn(self):
@@ -70,9 +81,19 @@ def parse_snapshot(text):
                         state=state if state in STATES else "partial",
                         active_profile=item.get("active_profile"), temporary=bool(item.get("temporary")),
                         started_at=number(item.get("started_at")), endpoint=item.get("endpoint") or None,
-                        rx_bytes=number(item.get("rx_bytes"), int), tx_bytes=number(item.get("tx_bytes"), int)))
+                        rx_bytes=number(item.get("rx_bytes"), int), tx_bytes=number(item.get("tx_bytes"), int),
+                        route_since=number(item.get("route_since")),
+                        vpn_seconds=number(item.get("vpn_seconds"), int),
+                        direct_seconds=number(item.get("direct_seconds"), int),
+                        route_rx_bytes=number(item.get("route_rx_bytes"), int),
+                        route_tx_bytes=number(item.get("route_tx_bytes"), int),
+                        executable=item.get("executable") or None, group=item.get("group") or None,
+                        killswitch=bool(item.get("killswitch")), dns=bool(item.get("dns"))))
+    groups = tuple((str(group["name"]), tuple(str(name) for name in group.get("apps", [])))
+                   for group in data.get("groups", []) if isinstance(group, dict) and group.get("name"))
     return Snapshot(profiles=tuple(str(name) for name in data.get("profiles", [])), apps=tuple(apps),
-                    platform=str(data.get("platform", sys.platform)), version=str(data.get("version", "")))
+                    platform=str(data.get("platform", sys.platform)), version=str(data.get("version", "")),
+                    groups=groups, manages="groups" in data)
 
 
 class CommandError(Exception):

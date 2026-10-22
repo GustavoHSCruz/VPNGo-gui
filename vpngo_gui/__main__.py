@@ -1,4 +1,7 @@
-"""vpngo-gui [--hidden] | --version | --update-engine | --askpass <prompt>  (run.py starts it)"""
+"""vpngo-gui [--hidden] | --version | --update-engine | --askpass <prompt>  (run.py starts it)
+
+--replace (used after an update) waits for the running interface to quit instead of showing it.
+"""
 
 import sys
 
@@ -21,11 +24,11 @@ def main(argv=None):
     if args[:1] == ["--askpass"]:
         from .askpass import client
         return client(" ".join(args[1:]))
-    if args not in ([], ["--hidden"]):
+    if args not in ([], ["--hidden"], ["--replace"]):
         print("Usage: vpngo-gui [--hidden | --update-engine | --version]", file=sys.stderr)
         return 2
     from .app import main as run
-    return run(hidden=args == ["--hidden"])
+    return run(hidden=args == ["--hidden"], replace=args == ["--replace"])
 
 
 if __name__ == "__main__":

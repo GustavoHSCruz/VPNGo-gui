@@ -19,6 +19,9 @@ ICONS = {
           'stroke-linejoin="round" fill="none"/>',
     "clock": '<circle cx="12" cy="12" r="8" stroke="{c}" stroke-width="2" fill="none"/>'
              '<path d="M12 8v4l3 2" stroke="{c}" stroke-width="2" stroke-linecap="round" fill="none"/>',
+    "sliders": '<path d="M4 8h9M17 8h3M4 16h3M11 16h9" stroke="{c}" stroke-width="1.8" stroke-linecap="round" '
+               'fill="none"/><circle cx="15" cy="8" r="2" stroke="{c}" stroke-width="1.8" fill="none"/>'
+               '<circle cx="9" cy="16" r="2" stroke="{c}" stroke-width="1.8" fill="none"/>',
     "layers": '<path d="M12 4l8 4-8 4-8-4 8-4z M4 12l8 4 8-4 M4 16l8 4 8-4" stroke="{c}" stroke-width="1.8" '
               'stroke-linejoin="round" stroke-linecap="round" fill="none"/>',
 }
@@ -189,9 +192,15 @@ class TotalRate(QWidget):
 
 
 class ServerLabel(QLabel):
-    """The VPN server address, masked until clicked; a second click hides it again."""
+    """An address masked until clicked; a second click hides it again.
+
+    On the VPN it is the server's address, which vpngo already knows. On the direct route
+    it is the public IP, which only an outside service can tell: it is looked up when the
+    user asks (lookup_requested), never before.
+    """
 
     revealed_changed = Signal(bool)
+    lookup_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -200,12 +209,17 @@ class ServerLabel(QLabel):
         self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.revealed = False
         self.short = False
+        self.public = False   # True: the direct route's public IP rather than the VPN server.
+        self.looking = False
         self.host = self.port = None
         self.hover = False
         self.setFixedHeight(18)
+        self._describe()
+
+    def _describe(self):
         from .i18n import tr
-        self.setAccessibleName(tr("server_name"))
-        self.setAccessibleDescription(tr("server_tip"))
+        self.setAccessibleName(tr("public_name" if self.public else "server_name"))
+        self.setAccessibleDescription(tr("public_tip" if self.public else "server_tip"))
 
     def focusInEvent(self, event):
         super().focusInEvent(event)
@@ -222,11 +236,41 @@ class ServerLabel(QLabel):
             self._render()
 
     def set_endpoint(self, host, port):
+        """The VPN server; None hides the label's text."""
+        if self.public:
+            self.public, self.revealed, self.looking = False, False, False
+            self._describe()
         if (host, port) != (self.host, self.port):
             self.host, self.port = host, port
             self._render()
 
+    def set_public(self, address):
+        """The direct route: address is the looked-up public IP, or None until someone asks."""
+        if not self.public:
+            self.public, self.revealed, self.host, self.port = True, False, None, None
+            self._describe()
+            self._render()
+        if self.looking and address is None:
+            return  # Still waiting for the answer.
+        if address != self.host:
+            self.host = address
+            if self.looking:
+                self.looking, self.revealed = False, True
+                self.revealed_changed.emit(True)
+            self._render()
+
+    def lookup_failed(self):
+        if self.looking:
+            self.looking = False
+            self._render()
+
     def toggle(self):
+        if self.public and not self.host:
+            if not self.looking:
+                self.looking = True
+                self._render()
+                self.lookup_requested.emit()
+            return
         if self.host:
             self.revealed = not self.revealed
             self._render()
@@ -253,14 +297,22 @@ class ServerLabel(QLabel):
     def _render(self):
         from .i18n import tr
         from .stats import masked
-        if not self.host:
+        if not self.host and not self.public:
             self.setText("")
             self.setToolTip("")
             return
-        self.setText(self.host if self.revealed else masked(self.host, short=self.short))
-        self.setToolTip(tr("server_shown_tip", port=self.port or "—") if self.revealed else tr("server_tip"))
+        if self.public and not self.host:
+            # The same shape as a masked address, so the line does not change size when it arrives.
+            self.setText("•.•.•.•" if self.short else "•••.•••.•••.•••")
+            self.setToolTip(tr("public_tip"))
+        elif self.revealed:
+            self.setText(self.host)
+            self.setToolTip(tr("public_shown_tip") if self.public else tr("server_shown_tip", port=self.port or "—"))
+        else:
+            self.setText(masked(self.host, short=self.short))
+            self.setToolTip(tr("public_hidden_tip" if self.public else "server_tip"))
         color = (theme.mix(theme.FAINT, theme.VPN, .75).name() if self.hasFocus() else
-                 theme.TEXT if self.hover else theme.MUTED)
+                 theme.TEXT if self.hover or self.looking else theme.MUTED)
         self.setStyleSheet(f"color: {color};")
 
 

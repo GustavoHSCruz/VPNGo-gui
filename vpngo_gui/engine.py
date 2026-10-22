@@ -34,7 +34,7 @@ from pathlib import Path
 
 REPOSITORY = "GustavoHSCruz/VPNGo"
 MINIMUM = (0, 5, 0)       # status --json and --install-gui
-RECOMMENDED = (0, 6, 0)   # running time, server and traffic on the tiles
+RECOMMENDED = (0, 7, 0)   # groups, time on each route, removing apps and profiles
 
 
 class EngineError(Exception):
@@ -164,7 +164,7 @@ def choose_engine(report=print):
         report(f"Using the installed {detail} ({command[0]}).")
         version = parse_version(detail)
         if version and version < RECOMMENDED:
-            report("Tip: update vpngo to see running time, traffic and the VPN server on each app.")
+            report("Tip: update vpngo for groups, the time on each route, and removing apps and profiles.")
         return command
     if detail.startswith("old:"):
         report(f"The installed {detail[4:]} is too old for the interface; it gets its own engine instead. "
