@@ -131,15 +131,20 @@ class StatsTest(unittest.TestCase):
             stale.load(path)
         self.assertEqual(stale.history, {})
 
-    def test_route_time_counts_from_the_last_switch(self):
-        from vpngo_gui.window import route_texts
+    def test_two_clocks_one_per_route(self):
+        from vpngo_gui.stats import short_duration
+        from vpngo_gui.window import route_clocks, route_tip
         now = time.time()
         app = cli.App(name="vesktop", profile="us", state="direct", started_at=now - 16 * 3600,
                       route_since=now - 10 * 60, vpn_seconds=15 * 3600 + 50 * 60, direct_seconds=600)
-        text, tip, short = route_texts(app)
-        self.assertEqual((text, short), ("10 min  ·  VPN 15 h 50 min", "10 min"))
+        self.assertEqual(route_clocks(app), (("vpn", 15 * 3600 + 50 * 60), ("direct", 600)))
+        tip = route_tip(app)
         self.assertIn("Direct for 10 min", tip)
         self.assertIn("Open for 16 h 00 min", tip)
+        self.assertEqual([short_duration(v) for v in (20, 27 * 60, 15 * 3600 + 46 * 60, 2 * 86400 + 3 * 3600)],
+                         ["0m", "27m", "15h46", "2d3h"])
+        older = cli.App(name="x", profile="us", state="vpn", started_at=now - 60)
+        self.assertEqual([route for route, _ in route_clocks(older)], ["vpn"])
 
     def test_readable_rates_uptime_and_masked_addresses(self):
         from vpngo_gui.stats import masked, rate_text, split_endpoint, uptime_text

@@ -106,6 +106,17 @@ def duration_text(seconds):
     return f"{days} d {hours % 24} h"
 
 
+def short_duration(seconds):
+    """The same span in a few characters, for narrow tiles: 0m, 27m, 15h46, 2d3h."""
+    seconds = max(0, int(seconds or 0))
+    minutes, hours, days = seconds // 60, seconds // 3600, seconds // 86400
+    if hours < 1:
+        return f"{minutes}m"
+    if days < 1:
+        return f"{hours}h{minutes % 60:02d}"
+    return f"{days}d{hours % 24}h"
+
+
 def uptime_text(started_at, now=None):
     if not started_at:
         return ""

@@ -1,5 +1,6 @@
 """The main window: one tile per app, lit by its route, gathered under its group."""
 
+import time
 from html import escape
 
 from PySide6.QtCore import QEasingCurve, QPointF, QRectF, QSize, Qt, QTimer, QVariantAnimation, Signal
@@ -12,8 +13,8 @@ from . import theme
 from .appicons import app_icon
 from .i18n import tr
 from .stats import bytes_text, duration_text, rate_text, split_endpoint, uptime_text
-from .widgets import (ElidedLabel, IconButton, PillButton, Rates, RouteSwitch, ServerLabel, StateDot, TotalRate,
-                      icon, rounded)
+from .widgets import (ElidedLabel, IconButton, PillButton, Rates, RouteClocks, RouteSwitch, ServerLabel, StateDot,
+                      TotalRate, icon, rounded)
 
 
 TILE_HEIGHT = 196
@@ -28,17 +29,25 @@ def state_color(state):
     return {"vpn": theme.VPN, "partial": theme.WARN}.get(state, theme.MUTED)
 
 
-def route_texts(app):
-    """(top-row text, tooltip, short text): time on the current route, and on the other one in total."""
+def route_clocks(app):
+    """((route, seconds), ...) for the top row: the time on the VPN and on the direct route.
+
+    vpngo before 0.7.0 reports neither; then the one clock is the time since the app started.
+    """
     if not app.running:
-        return "", "", ""
+        return ()
+    if app.vpn_seconds is not None and app.direct_seconds is not None:
+        return (("vpn", app.vpn_seconds), ("direct", app.direct_seconds))
     since = app.route_since or app.started_at
+    return ((("direct" if app.state == "direct" else "vpn"), time.time() - since),) if since else ()
+
+
+def route_tip(app):
+    """The clocks' tooltip: this route's time, both totals, the data on this route, and the open time."""
+    since = app.route_since or app.started_at
+    if not app.running or not since:
+        return ""
     current = uptime_text(since)
-    other = "direct" if app.state == "vpn" else "vpn" if app.state == "direct" else None
-    other_seconds = (app.direct_seconds if other == "direct" else app.vpn_seconds) if other else None
-    text = current
-    if other_seconds and other_seconds >= 60:
-        text += f"  ·  {tr('state_' + other)} {duration_text(other_seconds)}"
     lines = [tr({"vpn": "on_vpn_for", "direct": "direct_for"}.get(app.state, "partial_for"), time=current)]
     if app.vpn_seconds is not None:
         lines += [tr("total_vpn", time=duration_text(app.vpn_seconds)),
@@ -47,9 +56,7 @@ def route_texts(app):
         lines.append(f"{tr('fact_data')}: ↓ {bytes_text(app.route_rx_bytes)} ↑ {bytes_text(app.route_tx_bytes or 0)}")
     if app.started_at:
         lines.append(tr("open_for", time=uptime_text(app.started_at)))
-    if not since:
-        return "", "", ""
-    return text, "\n".join(lines), current
+    return "\n".join(lines)
 
 
 class Light:
@@ -150,6 +157,8 @@ class Tile(QWidget):
         painter.setClipPath(rounded(card, 14))
         for state, first, last in runs:
             color = state_color(state)
+            # Green carries the most meaning (the app is protected), so it reads a step stronger than grey.
+            area_alpha, line_alpha = (.16, .55) if state == "vpn" else (.10, .32)
             # Each stretch starts at the previous one's last point, so the line never breaks.
             stretch = points[max(0, first - 1):last + 1]
             if len(stretch) < 2:
@@ -160,7 +169,7 @@ class Tile(QWidget):
             area.lineTo(QPointF(stretch[-1].x(), band.bottom()))
             area.closeSubpath()
             fade = QLinearGradient(band.topLeft(), band.bottomLeft())
-            fade.setColorAt(0, theme.color(color, .10))
+            fade.setColorAt(0, theme.color(color, area_alpha))
             fade.setColorAt(1, theme.color(color, 0))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(fade)
@@ -171,7 +180,7 @@ class Tile(QWidget):
             # The oldest end fades in, so a trace that has not filled the band yet has no hard start.
             stroke = QLinearGradient(QPointF(points[0].x(), 0), QPointF(points[0].x() + 40, 0))
             stroke.setColorAt(0, theme.color(color, 0))
-            stroke.setColorAt(1, theme.color(color, .32))
+            stroke.setColorAt(1, theme.color(color, line_alpha))
             painter.setPen(QPen(stroke, 1.2))
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawPath(line)
@@ -207,11 +216,8 @@ class AppTile(Tile):
         top.setSpacing(6)
         self.dot = StateDot()
         top.addWidget(self.dot)
-        self.uptime = ElidedLabel()
-        self.uptime.setFont(theme.font(12, mono=True))
-        self.uptime.setStyleSheet(f"color: {theme.MUTED};")
-        self.uptime.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        top.addWidget(self.uptime, 1)
+        self.clocks = RouteClocks()
+        top.addWidget(self.clocks, 1, Qt.AlignmentFlag.AlignVCenter)
         self.more = IconButton("more", self.name)
         self.menu = QMenu(self.more)
         self.more.setMenu(self.menu)
@@ -304,8 +310,7 @@ class AppTile(Tile):
             self.server.set_public(getattr(self, "public_ip", None))
         else:
             self.server.set_endpoint(None, None)
-        self.route_text = route_texts(app)
-        self._fit_route_text()
+        self.clocks.set_clocks(route_clocks(app), "direct" if app.state == "direct" else "vpn", route_tip(app))
         if not running:
             self.set_traffic(None, ())
         self.update()
@@ -331,15 +336,6 @@ class AppTile(Tile):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._sync_compact()
-        self._fit_route_text()
-
-    def _fit_route_text(self):
-        """The other route's total only when it fits whole; a cut figure is worse than none."""
-        text, tip, short = getattr(self, "route_text", ("", "", ""))
-        if self.uptime.fontMetrics().horizontalAdvance(text) > self.uptime.width():
-            text = short
-        self.uptime.setText(text)
-        self.uptime.setToolTip(tip)
 
     def _sync_compact(self):
         """Below a 260px card the rates collapse to one total beside the server line; a revealed

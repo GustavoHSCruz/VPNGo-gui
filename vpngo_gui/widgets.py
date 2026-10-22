@@ -316,6 +316,55 @@ class ServerLabel(QLabel):
         self.setStyleSheet(f"color: {color};")
 
 
+class RouteClocks(QWidget):
+    """Time on the VPN and time on the direct route, side by side, told apart by color:
+    the VPN figure in route green, the direct one in grey, the route the app is on now
+    brighter than the other. When the full figures do not fit, both switch to the short
+    form (15h46) rather than being cut.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFont(theme.font(12, mono=True))
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setFixedHeight(18)
+        self.clocks = ()   # ((route, seconds), ...)
+        self.current = None
+
+    def set_clocks(self, clocks, current, tip=""):
+        clocks = tuple(clocks)
+        if (clocks, current) != (self.clocks, self.current):
+            self.clocks, self.current = clocks, current
+            self.update()
+        self.setToolTip(tip)
+
+    def _texts(self, short):
+        from .stats import duration_text, short_duration
+        # A clock that has not run yet reads 0, not "just now".
+        return [(route, short_duration(seconds) if short else duration_text(seconds) if seconds >= 60 else "0 min")
+                for route, seconds in self.clocks]
+
+    def paintEvent(self, event):
+        if not self.clocks:
+            return
+        painter = QPainter(self)
+        metrics = self.fontMetrics()
+        between = 14
+        entries = self._texts(short=False)
+        if sum(metrics.horizontalAdvance(text) for _, text in entries) + between * (len(entries) - 1) > self.width():
+            entries = self._texts(short=True)
+        x, baseline = 0.0, self.height() / 2 + metrics.capHeight() / 2
+        for route, text in entries:
+            on = route == self.current
+            if route == "vpn":
+                color = QColor(theme.VPN) if on else theme.mix(theme.VPN, theme.BG, .45)
+            else:
+                color = QColor(theme.TEXT) if on else theme.mix(theme.MUTED, theme.BG, .2)
+            painter.setPen(color)
+            painter.drawText(QPointF(x, baseline), text)
+            x += metrics.horizontalAdvance(text) + between
+
+
 class StateDot(QWidget):
     """The searxng mode dot: a 7px light with a 3px halo; hollow when stopped, breathing when busy."""
 
