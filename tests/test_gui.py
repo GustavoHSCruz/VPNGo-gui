@@ -92,6 +92,35 @@ class CliTest(FakeCli):
         self.assertEqual(cli.run(["x"]).strip(), "none")
 
 
+class StatsTest(unittest.TestCase):
+    def app(self, rx, tx, state="vpn"):
+        return cli.App(name="vesktop", profile="us", state=state, rx_bytes=rx, tx_bytes=tx)
+
+    def test_rates_come_from_counter_deltas_and_reset_when_counters_drop(self):
+        from vpngo_gui.stats import Traffic
+        traffic = Traffic()
+        self.assertEqual(traffic.update([self.app(1000, 100)], now=0), {})
+        self.assertEqual(traffic.update([self.app(7000, 400)], now=3), {"vesktop": (2000.0, 100.0)})
+        self.assertEqual(list(traffic.history["vesktop"]), [2100.0])
+        self.assertEqual(traffic.update([self.app(10, 5)], now=6), {})
+        self.assertEqual(list(traffic.history["vesktop"]), [])
+        traffic.update([self.app(None, None, "stopped")], now=9)
+        self.assertNotIn("vesktop", traffic.history)
+
+    def test_readable_rates_uptime_and_masked_addresses(self):
+        from vpngo_gui.stats import masked, rate_text, split_endpoint, uptime_text
+        self.assertEqual([rate_text(v) for v in (0, 950, 48_000, 1_240_000)], ["0 B/s", "950 B/s", "48 kB/s", "1.2 MB/s"])
+        self.assertEqual(uptime_text(1000, now=1000 + 23 * 60), "23 min")
+        self.assertEqual(uptime_text(0.0), "")
+        self.assertEqual(uptime_text(1000, now=1000 + 4 * 3600 + 59 * 60), "4 h 59 min")
+        self.assertEqual(uptime_text(1000, now=1000 + 2 * 86400 + 3 * 3600), "2 d 3 h")
+        self.assertEqual(split_endpoint("146.70.230.82:51820"), ("146.70.230.82", "51820"))
+        self.assertEqual(split_endpoint("[2001:db8::1]:51820"), ("2001:db8::1", "51820"))
+        self.assertEqual(masked("146.70.230.82"), "146.70.•••.•••")
+        self.assertEqual(masked("2001:db8::1"), "2001:db8:•••")
+        self.assertNotIn("230", masked("146.70.230.82"))
+
+
 class TranslationTest(unittest.TestCase):
     def test_both_languages_have_the_same_messages(self):
         self.assertEqual(set(MESSAGES["en-US"]), set(MESSAGES["pt-BR"]))
@@ -179,6 +208,22 @@ class WindowTest(FakeCli):
         controller.refresh()
         self.settle(lambda: not controller.refreshing)
         self.assertEqual(controller.window.tiles, tiles)
+
+    def test_server_address_is_masked_until_clicked(self):
+        data = json.loads(self.state.read_text())
+        data["apps"][0]["endpoint"] = "146.70.230.82:51820"
+        self.state.write_text(json.dumps(data))
+        controller = self.controller()
+        server = controller.window.tiles["vesktop"].server
+        self.assertEqual(server.text(), "146.70.•••.•••")
+        server.toggle()
+        self.assertEqual(server.text(), "146.70.230.82")
+        controller.refresh()
+        self.settle(lambda: not controller.refreshing)
+        self.assertEqual(server.text(), "146.70.230.82")  # A refresh keeps the user's choice.
+        server.toggle()
+        self.assertEqual(server.text(), "146.70.•••.•••")
+        self.assertEqual(controller.window.tiles["spotify"].server.text(), "")
 
     def test_actions_run_the_matching_vpngo_commands(self):
         controller = self.controller()

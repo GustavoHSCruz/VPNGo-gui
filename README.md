@@ -2,6 +2,8 @@
 
 A tray app and window for [vpngo](https://github.com/GustavoHSCruz/VPNGo), the launcher that routes individual apps through WireGuard. Each app is a tile lit by its route: green on the VPN, unlit on the direct route, hollow when stopped.
 
+A running app's tile also shows how long it has been running, its download and upload rates with a faint trace of the last two minutes, and the VPN server's address, masked until you click it.
+
 From the window or the tray you can:
 
 - start, restart and stop an app;
@@ -13,7 +15,7 @@ The interface runs the same `vpngo` commands you would type, so the command line
 
 ## Install
 
-Install vpngo 0.5.0 or newer first, then run:
+Install vpngo 0.5.0 or newer first (0.6.0 or newer for running time, traffic and server address), then run:
 
 ```sh
 vpngo --install-gui

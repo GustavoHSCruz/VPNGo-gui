@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
 from . import theme
 from .i18n import tr
+from .stats import uptime_text
 from .window import add_profiles
 
 
@@ -80,6 +81,8 @@ class Tray(QSystemTrayIcon):
 
     def _app_menu(self, app, profiles):
         state = f"{app.shown_profile} · {self.busy.get(app.name) or tr('state_' + app.state)}"
+        if app.running and app.started_at and app.name not in self.busy:
+            state += f" · {uptime_text(app.started_at)}"
         menu = QMenu(f"{app.name}    {state}", self.menu)
         menu.setEnabled(app.name not in self.busy)
         emit = self.app_action.emit

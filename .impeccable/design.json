@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-21T23:45:00-03:00",
+  "generatedAt": "2026-10-22T12:00:00-03:00",
   "title": "Design System: VPNGo",
   "extensions": {
     "colorMeta": {
@@ -260,7 +260,7 @@
       },
       "data-small": {
         "displayName": "Data Small",
-        "purpose": "Profile name inside the tile detail line."
+        "purpose": "Profile in the tile detail line; tile measurements: uptime, rates, compact total, server address."
       }
     },
     "shadows": [
@@ -305,6 +305,11 @@
         "name": "message-timeout",
         "value": "6000ms",
         "purpose": "Success message auto-dismiss; errors persist."
+      },
+      {
+        "name": "trace-crossfade",
+        "value": "600ms cubic-bezier(.33, 1, .68, 1)",
+        "purpose": "Traffic trace colour is mix(muted, route accent, route strength), so it rides the route cross-fade."
       }
     ],
     "breakpoints": [
@@ -320,8 +325,23 @@
       {
         "name": "window-default",
         "value": "760x520"
+      },
+      {
+        "name": "compact-card",
+        "value": "260px",
+        "purpose": "Card width below which rates collapse to one total on the server line and the address mask shortens."
       }
-    ]
+    ],
+    "traffic-trace": {
+      "history": "40 samples at the 3s refresh (about two minutes)",
+      "minSamples": 20,
+      "quietThreshold": "4 KiB/s (no trace when every sample is below)",
+      "minPeak": "16 KiB/s",
+      "band": "card top +44px to mid-card",
+      "fill": "vertical gradient, accent-mix at 10% alpha to 0",
+      "line": "1.2px at 32% alpha; oldest 40px fade in from 0",
+      "color": "mix(muted, route accent, route strength)"
+    }
   },
   "components": [
     {
@@ -360,9 +380,17 @@
       "name": "App Tile (on the VPN)",
       "kind": "card",
       "refersTo": "app-tile",
-      "description": "The signature tile, lit green by its route, with inset highlight and long soft shadow.",
-      "html": "<div class=\"ds-tile ds-tile-on\"><div class=\"ds-tile-top\"><i class=\"ds-dot\"></i><span class=\"ds-more\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\"><circle cx=\"5\" cy=\"12\" r=\"1.6\" fill=\"#8b8984\"/><circle cx=\"12\" cy=\"12\" r=\"1.6\" fill=\"#8b8984\"/><circle cx=\"19\" cy=\"12\" r=\"1.6\" fill=\"#8b8984\"/></svg></span></div><div class=\"ds-tile-name\">firefox</div><div class=\"ds-tile-row\"><span class=\"ds-tile-detail\"><code>br</code> &nbsp;·&nbsp; VPN</span><span class=\"ds-switch ds-switch-on\"><i></i></span></div></div>",
-      "css": ".ds-tile { font-family: Inter, system-ui, sans-serif; box-sizing: border-box; width: 230px; height: 168px; padding: 14px 14px 16px 18px; display: flex; flex-direction: column; border: 1px solid #26262a; border-radius: 14px; background: linear-gradient(#19191c, #19191c); box-shadow: inset 0 1px 0 rgb(255 255 255 / .035), 0 12px 32px -16px rgb(0 0 0 / .6); color: #e9e7e2; transition: border-color .6s cubic-bezier(.33,1,.68,1), background .6s; } .ds-tile-on { border-color: #376d55; background: linear-gradient(#1d2725, #19191c); } .ds-tile:hover { border-color: #3c8362; } .ds-tile-top { display: flex; justify-content: space-between; align-items: center; flex: 1; align-items: flex-start; } .ds-tile .ds-dot { margin: 4px; width: 7px; height: 7px; border-radius: 50%; background: #4cc38a; box-shadow: 0 0 0 3px rgb(76 195 138 / .22); } .ds-more { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; margin-top: -8px; } .ds-more:hover { background: #26262a; } .ds-tile-name { font-size: 20px; font-weight: 600; letter-spacing: -0.2px; margin-bottom: 6px; } .ds-tile-row { display: flex; align-items: center; justify-content: space-between; height: 28px; } .ds-tile-detail { color: #8b8984; font-size: 13px; } .ds-tile-detail code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; } .ds-switch { position: relative; width: 34px; height: 20px; border-radius: 10px; background: #26262a; transition: background .2s; } .ds-switch i { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #8b8984; transition: left .2s cubic-bezier(.33,1,.68,1), background .2s; } .ds-switch-on { background: #376d55; } .ds-switch-on i { left: 17px; background: #e9e7e2; }"
+      "description": "The signature tile, lit green by its route: uptime, traffic trace, stacked rates beside the name, masked server line.",
+      "html": "<div class=\"ds-tile ds-tile-on\"><div class=\"ds-tile-top\"><i class=\"ds-dot\"></i><span class=\"ds-uptime\">4 h 59 min</span><span class=\"ds-more\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\"><circle cx=\"5\" cy=\"12\" r=\"1.6\" fill=\"#8b8984\"/><circle cx=\"12\" cy=\"12\" r=\"1.6\" fill=\"#8b8984\"/><circle cx=\"19\" cy=\"12\" r=\"1.6\" fill=\"#8b8984\"/></svg></span></div><svg class=\"ds-trace\" viewBox=\"0 0 228 54\" preserveAspectRatio=\"none\"><defs><linearGradient id=\"dsTf\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#4cc38a\" stop-opacity=\".10\"/><stop offset=\"1\" stop-color=\"#4cc38a\" stop-opacity=\"0\"/></linearGradient><linearGradient id=\"dsTl\" x1=\"0\" x2=\"40\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#4cc38a\" stop-opacity=\"0\"/><stop offset=\"1\" stop-color=\"#4cc38a\" stop-opacity=\".32\"/></linearGradient></defs><path d=\"M0 54 L0 30 C30 0 50 0 76 30 S120 0 152 30 S200 0 228 30 L228 54Z\" fill=\"url(#dsTf)\"/><path d=\"M0 30 C30 0 50 0 76 30 S120 0 152 30 S200 0 228 30\" stroke=\"url(#dsTl)\" stroke-width=\"1.2\" fill=\"none\"/></svg><div class=\"ds-tile-head\"><div class=\"ds-tile-name\">firefox</div><div class=\"ds-rates\"><span>1,3 MB/s <svg viewBox=\"0 0 24 24\" width=\"10\" height=\"10\"><path d=\"M12 5v14M6 13l6 6 6-6\" stroke=\"#8b8984\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/></svg></span><span>48 kB/s <svg viewBox=\"0 0 24 24\" width=\"10\" height=\"10\"><path d=\"M12 19V5M6 11l6-6 6 6\" stroke=\"#8b8984\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/></svg></span></div></div><div class=\"ds-server\" tabindex=\"0\">185.159.•••.•••</div><div class=\"ds-tile-row\"><span class=\"ds-tile-detail\"><code>br</code> &nbsp;·&nbsp; VPN</span><span class=\"ds-switch ds-switch-on\"><i></i></span></div></div>",
+      "css": ".ds-tile { font-family: Inter, system-ui, sans-serif; box-sizing: border-box; width: 230px; height: 196px; padding: 14px 14px 16px 18px; display: flex; flex-direction: column; position: relative; overflow: hidden; border: 1px solid #26262a; border-radius: 14px; background: linear-gradient(#19191c, #19191c); box-shadow: inset 0 1px 0 rgb(255 255 255 / .035), 0 12px 32px -16px rgb(0 0 0 / .6); color: #e9e7e2; transition: border-color .6s cubic-bezier(.33,1,.68,1), background .6s; } .ds-tile-on { border-color: #376d55; background: linear-gradient(#1d2725, #19191c); } .ds-tile:hover { border-color: #3c8362; } .ds-tile-top { display: flex; align-items: flex-start; flex: 1; } .ds-tile .ds-dot { margin: 4px; width: 7px; height: 7px; border-radius: 50%; background: #4cc38a; box-shadow: 0 0 0 3px rgb(76 195 138 / .22); } .ds-more { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; margin-top: -8px; } .ds-more:hover { background: #26262a; } .ds-tile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 20px; font-weight: 600; letter-spacing: -0.2px; } .ds-tile-head { display: flex; align-items: flex-end; gap: 10px; } .ds-uptime { flex: 1; min-width: 0; margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: #8b8984; line-height: 15px; } .ds-rates { width: 78px; height: 28px; display: flex; flex-direction: column; align-items: flex-end; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; line-height: 14px; color: #8b8984; } .ds-rates span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; } .ds-server { height: 18px; margin: 2px 0 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; line-height: 18px; color: #8b8984; cursor: pointer; outline: none; align-self: flex-start; } .ds-server:hover { color: #e9e7e2; } .ds-server:focus-visible { color: #429c72; } .ds-trace { position: absolute; left: 1px; right: 1px; top: 44px; width: calc(100% - 2px); height: 54px; pointer-events: none; }  .ds-tile-row { display: flex; align-items: center; justify-content: space-between; height: 28px; } .ds-tile-detail { color: #8b8984; font-size: 13px; } .ds-tile-detail code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; } .ds-switch { position: relative; width: 34px; height: 20px; border-radius: 10px; background: #26262a; transition: background .2s; } .ds-switch i { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #8b8984; transition: left .2s cubic-bezier(.33,1,.68,1), background .2s; } .ds-switch-on { background: #376d55; } .ds-switch-on i { left: 17px; background: #e9e7e2; }"
+    },
+    {
+      "name": "Server Line (compact card)",
+      "kind": "custom",
+      "refersTo": "server-line",
+      "description": "Masked VPN address (click/Enter reveals) with the compact total rate beside it on cards under 260px; the total steps aside while the address is shown.",
+      "html": "<div class=\"ds-stats\"><span class=\"ds-server2\" tabindex=\"0\">146.70.•.•</span><span class=\"ds-total\"><svg viewBox=\"0 0 24 24\" width=\"10\" class=\"d\" height=\"10\"><path d=\"M12 5v14M6 13l6 6 6-6\" stroke=\"#8b8984\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/></svg><svg viewBox=\"0 0 24 24\" width=\"10\" height=\"10\"><path d=\"M12 19V5M6 11l6-6 6 6\" stroke=\"#8b8984\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/></svg> 58 kB/s</span></div>",
+      "css": ".ds-stats { width: 196px; height: 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: #8b8984; } .ds-server2 { cursor: pointer; outline: none; transition: color .2s; } .ds-server2:hover { color: #e9e7e2; } .ds-server2:focus-visible { color: #429c72; } .ds-total { width: 84px; display: inline-flex; align-items: center; justify-content: flex-end; white-space: nowrap; } .ds-total svg + svg { margin-left: -3px; margin-right: 4px; }"
     },
     {
       "name": "Route Switch",
@@ -378,7 +406,7 @@
       "refersTo": "add-tile",
       "description": "Dashed empty slot that closes the board.",
       "html": "<button class=\"ds-add-tile\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\"><path d=\"M12 5v14M5 12h14\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" fill=\"none\"/></svg>Adicionar app</button>",
-      "css": ".ds-add-tile { font-family: Inter, system-ui, sans-serif; width: 230px; height: 168px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #26262a; border-radius: 14px; background: transparent; color: #8b8984; font-size: 14px; cursor: pointer; transition: border-color .2s, color .2s; } .ds-add-tile:hover { border-color: #49494a; background: rgb(255 255 255 / .02); color: #e9e7e2; } .ds-add-tile:focus-visible { outline: none; border-color: #376d55; color: #e9e7e2; }"
+      "css": ".ds-add-tile { font-family: Inter, system-ui, sans-serif; width: 230px; height: 196px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #26262a; border-radius: 14px; background: transparent; color: #8b8984; font-size: 14px; cursor: pointer; transition: border-color .2s, color .2s; } .ds-add-tile:hover { border-color: #49494a; background: rgb(255 255 255 / .02); color: #e9e7e2; } .ds-add-tile:focus-visible { outline: none; border-color: #376d55; color: #e9e7e2; }"
     },
     {
       "name": "Message Bar (error)",
@@ -399,11 +427,11 @@
   ],
   "narrative": {
     "northStar": "The Route Is the Light",
-    "overview": "VPNGo is a small dark board the user opens from the tray, reads in one glance, and closes. Every managed app is a tile, and the tile's light is its route: lit green while the app is on the VPN, unlit warm grey on the direct route, amber when the route cannot be confirmed, and sunk into the ground, hollow-dotted and dimmed, when the app is stopped. Color is read before any word; text confirms what the light already said.\n\nThe world is inherited, binding, from the owner's local search site: warm near-black neutrals, Inter for language, JetBrains Mono only for data, one connection color that carries state, 14px cards with an inset top highlight and a long soft shadow, and a faint radial glow at the top of the window that takes the overall state's color. Density is low and calm: three columns of 168px tiles at the default 760x520, generous inner space above the app name, nothing that looks like a settings table.\n\nMotion is state, never decoration. Route changes cross-fade the tile border, top tint and state dot over 600ms ease-out; the window glow follows the same curve; a busy app's dot breathes its halo on an 1100ms sine loop. Refresh never moves or rebuilds a tile under the pointer or a focused control.",
+    "overview": "VPNGo is a small dark board the user opens from the tray, reads in one glance, and closes. Every managed app is a tile, and the tile's light is its route: lit green while the app is on the VPN, unlit warm grey on the direct route, amber when the route cannot be confirmed, and sunk into the ground, hollow-dotted and dimmed, when the app is stopped. Color is read before any word; text confirms what the light already said.\n\nThe world is inherited, binding, from the owner's local search site: warm near-black neutrals, Inter for language, JetBrains Mono only for data, one connection color that carries state, 14px cards with an inset top highlight and a long soft shadow, and a faint radial glow at the top of the window that takes the overall state's color. Density is low and calm: three columns of 196px tiles at the default 760x520, generous inner space above the app name, nothing that looks like a settings table.\n\nMotion is state, never decoration. Route changes cross-fade the tile border, top tint and state dot over 600ms ease-out; the window glow follows the same curve; a busy app's dot breathes its halo on an 1100ms sine loop. Refresh never moves or rebuilds a tile under the pointer or a focused control, and live figures never shift the layout: every rate sits in a fixed-width slot.",
     "keyCharacteristics": [
       "Warm near-black ground with a single semantic accent (route green), plus amber for unverifiable routes and coral for failures.",
       "Tiles are the only shadowed objects; everything else is flat with 1px hairlines.",
-      "Inter for words, JetBrains Mono for profile names, paths and endpoints.",
+      "Inter for words, JetBrains Mono for data and measurements: profile names, paths, addresses, uptime and rates.",
       "Pills and rounded rectangles only; no sharp corners anywhere.",
       "State is painted (dots, switch fill, border tint), and every state change animates."
     ],
@@ -420,8 +448,13 @@
       },
       {
         "name": "The Data Is Mono Rule",
-        "body": "Profile names, file paths and endpoints set in JetBrains Mono; route words, actions and labels set in Inter, even on the same line (\"us · VPN\").",
+        "body": "Data and measurements set in JetBrains Mono: profile names, file paths, server addresses, uptime and transfer rates (units included, \"58 kB/s\", \"4 h 59 min\"). Route words, actions and labels set in Inter, even on the same line (\"us · VPN\"). One accepted exception, the owner's call: profile names inside QMenus (tile and tray menus) stay in Inter so they remain plain checkable items, one click deep and arrow-key navigable.",
         "section": "typography"
+      },
+      {
+        "name": "The Compact Card Rule",
+        "body": "A card narrower than 260px is compact: the stacked ↓/↑ rates beside the name collapse into one combined total at the right of the server line, and the masked address shortens to one bullet per hidden part (146.70.•.•). A revealed address needs that room, so the total steps aside while the address is shown. The switch is the card's width, measured on every resize, not the window's. Dialogs: 420px minimum width, 24/22/24/20 padding, field caption 6px above its control, 10px between fields, actions right-aligned with 8px between.",
+        "section": "layout"
       },
       {
         "name": "The Only Tiles Float Rule",
@@ -432,7 +465,8 @@
     "dos": [
       "**Do** let the tile itself carry the route: border, top tint and dot change together over 600ms ease-out.",
       "**Do** derive new tones by mixing palette colors (the Mixed, Not Invented Rule) instead of adding hexes.",
-      "**Do** set profile names, paths and endpoints in JetBrains Mono and every word around them in Inter.",
+      "**Do** set profile names, paths, addresses, uptime and rates in JetBrains Mono and every word around them in Inter.",
+      "**Do** give every live figure a fixed-width slot (\"000 kB/s\") so refreshes never move the text beside it.",
       "**Do** keep a stopped app visibly sunk: no shadow, no highlight, dimmed title, hollow dot, \"Iniciar\" in place of the switch.",
       "**Do** keep at most one bone primary button per view; everything else is a ghost pill.",
       "**Do** update state in place; never move or rebuild a tile, menu or control the user is pointing at or focused on."

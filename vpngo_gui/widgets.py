@@ -1,9 +1,9 @@
 """Painted controls in the searxng language: state dot, route switch, icons."""
 
-from PySide6.QtCore import Property, QByteArray, QEasingCurve, QPointF, QRectF, QSize, Qt, QVariantAnimation
+from PySide6.QtCore import Property, QByteArray, QEasingCurve, QPointF, QRectF, QSize, Qt, QVariantAnimation, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QAbstractButton, QSizePolicy, QToolButton, QWidget
+from PySide6.QtWidgets import QAbstractButton, QLabel, QSizePolicy, QToolButton, QWidget
 
 from . import theme
 
@@ -13,6 +13,12 @@ ICONS = {
             '<circle cx="19" cy="12" r="1.6" fill="{c}"/>',
     "plus": '<path d="M12 5v14M5 12h14" stroke="{c}" stroke-width="2" stroke-linecap="round" fill="none"/>',
     "close": '<path d="M7 7l10 10M17 7L7 17" stroke="{c}" stroke-width="2" stroke-linecap="round" fill="none"/>',
+    "down": '<path d="M12 5v14M6 13l6 6 6-6" stroke="{c}" stroke-width="2.2" stroke-linecap="round" '
+            'stroke-linejoin="round" fill="none"/>',
+    "up": '<path d="M12 19V5M6 11l6-6 6 6" stroke="{c}" stroke-width="2.2" stroke-linecap="round" '
+          'stroke-linejoin="round" fill="none"/>',
+    "clock": '<circle cx="12" cy="12" r="8" stroke="{c}" stroke-width="2" fill="none"/>'
+             '<path d="M12 8v4l3 2" stroke="{c}" stroke-width="2" stroke-linecap="round" fill="none"/>',
     "layers": '<path d="M12 4l8 4-8 4-8-4 8-4z M4 12l8 4 8-4 M4 16l8 4 8-4" stroke="{c}" stroke-width="1.8" '
               'stroke-linejoin="round" stroke-linecap="round" fill="none"/>',
 }
@@ -100,6 +106,162 @@ class PillButton(QAbstractButton):
         painter.setPen(QColor(color))
         baseline = (self.height() + self.fontMetrics().capHeight()) / 2
         painter.drawText(QPointF(start + ink_width + gap - tight.left(), baseline), self.text())
+
+
+class ElidedLabel(QLabel):
+    """A one-line label that ends in "…" when it does not fit, with the full text as its tooltip."""
+
+    def minimumSizeHint(self):
+        return QSize(40, super().minimumSizeHint().height())
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        metrics = self.fontMetrics()
+        text = metrics.elidedText(self.text(), Qt.TextElideMode.ElideRight, self.width())
+        if text != self.text() and not self.toolTip():
+            self.setToolTip(self.text())
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.drawText(self.rect(), int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), text)
+
+
+class Rates(QWidget):
+    """Download over upload, right-aligned in mono beside the app name, each with a drawn arrow."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFont(theme.font(12, mono=True))
+        self.values = ("", "")
+        # As wide as the widest rate ever shown, so the title's cut point never moves between refreshes.
+        self.setFixedSize(self.fontMetrics().horizontalAdvance("000 kB/s") + 14, 28)
+
+    def set_rates(self, down, up, tips=("", "")):
+        if (down, up) != self.values:
+            self.values = (down, up)
+            self.setToolTip(f"{tips[0]}: {down}\n{tips[1]}: {up}" if down else "")
+            self.update()
+
+    def sizeHint(self):
+        return self.size()
+
+    def minimumSizeHint(self):
+        return self.sizeHint()
+
+    def paintEvent(self, event):
+        if not self.values[0]:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        metrics = self.fontMetrics()
+        for row, (name, text) in enumerate(zip(("down", "up"), self.values)):
+            top = row * 14
+            painter.drawPixmap(QRectF(self.width() - 10, top + 2, 10, 10).toRect(), icon_pixmap(name, theme.MUTED, 10))
+            painter.setPen(QColor(theme.MUTED))
+            painter.drawText(QPointF(self.width() - 14 - metrics.horizontalAdvance(text), top + 7 + metrics.capHeight() / 2),
+                             text)
+
+
+class TotalRate(QWidget):
+    """Narrow tiles: download plus upload as one figure, marked by the drawn arrow pair, fixed width."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFont(theme.font(12, mono=True))
+        self.text = ""
+        self.setFixedSize(16 + 4 + self.fontMetrics().horizontalAdvance("000 kB/s"), 18)
+
+    def set_text(self, text, tip=""):
+        if text != self.text:
+            self.text = text
+            self.setToolTip(tip)
+            self.update()
+
+    def paintEvent(self, event):
+        if not self.text:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        metrics = self.fontMetrics()
+        x = self.width() - metrics.horizontalAdvance(self.text) - 20
+        painter.drawPixmap(QRectF(x, 4, 10, 10).toRect(), icon_pixmap("down", theme.MUTED, 10))
+        painter.drawPixmap(QRectF(x + 7, 4, 10, 10).toRect(), icon_pixmap("up", theme.MUTED, 10))
+        painter.setPen(QColor(theme.MUTED))
+        painter.drawText(QPointF(x + 20, (18 + metrics.capHeight()) / 2), self.text)
+
+
+class ServerLabel(QLabel):
+    """The VPN server address, masked until clicked; a second click hides it again."""
+
+    revealed_changed = Signal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFont(theme.font(12, mono=True))
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self.revealed = False
+        self.short = False
+        self.host = self.port = None
+        self.hover = False
+        self.setFixedHeight(18)
+        from .i18n import tr
+        self.setAccessibleName(tr("server_name"))
+        self.setAccessibleDescription(tr("server_tip"))
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self._render()
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self._render()
+
+    def set_short(self, short):
+        """Narrow tiles mask with one bullet per hidden part, to leave room for the rate."""
+        if short != self.short:
+            self.short = short
+            self._render()
+
+    def set_endpoint(self, host, port):
+        if (host, port) != (self.host, self.port):
+            self.host, self.port = host, port
+            self._render()
+
+    def toggle(self):
+        if self.host:
+            self.revealed = not self.revealed
+            self._render()
+            self.revealed_changed.emit(self.revealed)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.toggle()
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.toggle()
+        else:
+            super().keyPressEvent(event)
+
+    def enterEvent(self, event):
+        self.hover = True
+        self._render()
+
+    def leaveEvent(self, event):
+        self.hover = False
+        self._render()
+
+    def _render(self):
+        from .i18n import tr
+        from .stats import masked
+        if not self.host:
+            self.setText("")
+            self.setToolTip("")
+            return
+        self.setText(self.host if self.revealed else masked(self.host, short=self.short))
+        self.setToolTip(tr("server_shown_tip", port=self.port or "—") if self.revealed else tr("server_tip"))
+        color = (theme.mix(theme.FAINT, theme.VPN, .75).name() if self.hasFocus() else
+                 theme.TEXT if self.hover else theme.MUTED)
+        self.setStyleSheet(f"color: {color};")
 
 
 class StateDot(QWidget):

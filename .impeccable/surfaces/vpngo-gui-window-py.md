@@ -21,7 +21,7 @@ OWN-WORLD: the ~/searxng site: ground #111113, surface #19191c, hairline #26262a
 
 STORY: the user opens the window, reads the tile colors before any word, flips a switch or starts an app, and closes the window; the tray remembers everything.
 
-FIRST VIEWPORT: 760x520 default. Top bar: "VPNGo" wordmark left, a pill on the right with the state dot and "2 de 3 na VPN". Below, a 3-column grid of 168px tiles: state dot top-left, overflow menu top-right, app name 20px semibold, then profile in mono with the VPN switch at the bottom right; stopped tiles show "Iniciar" instead of the switch. Last cell: dashed "+ Adicionar app" tile. Profiles live behind a "Perfis" control in the top bar.
+FIRST VIEWPORT: 760x520 default. Top bar: "VPNGo" wordmark left, a pill on the right with the state dot and "2 de 3 na VPN". Below, a 3-column grid of 196px tiles: state dot top-left, overflow menu top-right, app name 20px semibold, then profile in mono with the VPN switch at the bottom right; stopped tiles show "Iniciar" instead of the switch. Last cell: dashed "+ Adicionar app" tile. Profiles live behind a "Perfis" control in the top bar.
 
 FORM: tile board, the user's locked surface (dealt 2 of 3, position 1 on the page); seed:cb2d8d99ff368095.
 

@@ -14,6 +14,7 @@ from . import cli, theme
 from .askpass import Broker, password_valid
 from .dialogs import AddAppDialog, AddProfileDialog, PasswordDialog
 from .i18n import tr
+from .stats import Traffic
 from .tray import Tray
 from .window import Window
 
@@ -49,6 +50,7 @@ class Controller(QObject):
         self.results.snapshot.connect(self._snapshot)
         self.results.finished.connect(self._finished)
         self.busy = {}
+        self.traffic = Traffic()
         self.current = None
         self.refreshing = False
         self.window.app_action.connect(self.act)
@@ -84,7 +86,9 @@ class Controller(QObject):
             self.window.show_unavailable(tr("cli_missing") if error == "vpngo-missing" else error)
             return
         self.current = snapshot
+        rates = self.traffic.update(snapshot.apps)
         self.window.show_snapshot(snapshot)
+        self.window.set_traffic(rates, self.traffic.history)
         self.window.set_busy(self.busy)
         if self.tray:
             self.tray.show_snapshot(snapshot, self.busy)

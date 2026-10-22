@@ -26,6 +26,10 @@ class App:
     state: str
     active_profile: str | None = None
     temporary: bool = False
+    started_at: float | None = None
+    endpoint: str | None = None
+    rx_bytes: int | None = None
+    tx_bytes: int | None = None
 
     @property
     def running(self):
@@ -47,6 +51,14 @@ class Snapshot:
         return sum(1 for app in self.apps if app.state == "vpn")
 
 
+def number(value, kind=float):
+    """Optional numeric field: older vpngo versions omit it."""
+    try:
+        return kind(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def parse_snapshot(text):
     data = json.loads(text)
     if not isinstance(data, dict) or data.get("schema") != 1:
@@ -56,7 +68,9 @@ def parse_snapshot(text):
         state = item.get("state")
         apps.append(App(name=str(item["name"]), profile=str(item.get("profile", "default")),
                         state=state if state in STATES else "partial",
-                        active_profile=item.get("active_profile"), temporary=bool(item.get("temporary"))))
+                        active_profile=item.get("active_profile"), temporary=bool(item.get("temporary")),
+                        started_at=number(item.get("started_at")), endpoint=item.get("endpoint") or None,
+                        rx_bytes=number(item.get("rx_bytes"), int), tx_bytes=number(item.get("tx_bytes"), int)))
     return Snapshot(profiles=tuple(str(name) for name in data.get("profiles", [])), apps=tuple(apps),
                     platform=str(data.get("platform", sys.platform)))
 

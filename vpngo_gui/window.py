@@ -4,16 +4,18 @@ from html import escape
 
 from PySide6.QtCore import QEasingCurve, QPointF, QRectF, QSize, Qt, QTimer, QVariantAnimation, Signal
 from PySide6.QtGui import (QAction, QActionGroup, QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter,
-                           QPen, QRadialGradient, QShortcut)
+                           QPainterPath, QPen, QRadialGradient, QShortcut)
 from PySide6.QtWidgets import (QGridLayout, QHBoxLayout, QLabel, QMenu, QPushButton, QScrollArea, QSizePolicy,
                                QVBoxLayout, QWidget)
 
 from . import theme
 from .i18n import tr
-from .widgets import IconButton, PillButton, RouteSwitch, StateDot, icon, rounded
+from .stats import rate_text, split_endpoint, uptime_text
+from .widgets import (ElidedLabel, IconButton, PillButton, Rates, RouteSwitch, ServerLabel, StateDot, TotalRate,
+                      icon, rounded)
 
 
-TILE_HEIGHT = 168
+TILE_HEIGHT = 196
 TILE_MIN_WIDTH = 210
 SIDE = 7     # Room beside each tile; two of them make the 14px column gap.
 TOP = 2      # Room above; with BELOW it makes the 22px row gap.
@@ -58,6 +60,7 @@ class Tile(QWidget):
         self.alive.value = 1.0
         self.warn = 0.0
         self.hover = 0.0
+        self.history = ()   # Recent total rates, oldest first: drawn as the tile's traffic trace.
 
     def card_rect(self):
         return QRectF(self.rect()).adjusted(SIDE, TOP, -SIDE, -BELOW)
@@ -88,8 +91,48 @@ class Tile(QWidget):
             border = theme.mix(border.name(), theme.MUTED if not strength else accent, .25 * self.hover)
         painter.setPen(QPen(border, 1))
         painter.drawPath(rounded(card.adjusted(.5, .5, -.5, -.5), 14))
+        self._paint_trace(painter, card, theme.mix(theme.MUTED, accent, strength).name())
         painter.setPen(QPen(QColor(255, 255, 255, int(9 * alive)), 1))
         painter.drawLine(QPointF(card.left() + 14, card.top() + 1.5), QPointF(card.right() - 14, card.top() + 1.5))
+
+    def _paint_trace(self, painter, card, color):
+        """The last two minutes of traffic as a faint area behind the text, in the route's color."""
+        from .stats import HISTORY, QUIET
+        samples = list(self.history)
+        # Half a window of history before drawing, and nothing for an idle app: a flat line reads as a divider.
+        if len(samples) < HISTORY // 2 or self.alive.value < .5 or max(samples) < QUIET:
+            return
+        peak = max(max(samples), QUIET * 4)
+        # Between the top row and the app name, so the trace never runs under text.
+        band = QRectF(card.left() + 1, card.top() + 44, card.width() - 2, card.height() * .5 - 44)
+        step = band.width() / (HISTORY - 1)
+        start = band.right() - step * (len(samples) - 1)
+        points = [QPointF(start + index * step, band.bottom() - band.height() * min(1.0, value / peak))
+                  for index, value in enumerate(samples)]
+        area = QPainterPath(QPointF(points[0].x(), band.bottom()))
+        for point in points:
+            area.lineTo(point)
+        area.lineTo(QPointF(points[-1].x(), band.bottom()))
+        area.closeSubpath()
+        painter.save()
+        painter.setClipPath(rounded(card, 14))
+        fade = QLinearGradient(band.topLeft(), band.bottomLeft())
+        fade.setColorAt(0, theme.color(color, .10))
+        fade.setColorAt(1, theme.color(color, 0))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(fade)
+        painter.drawPath(area)
+        line = QPainterPath(points[0])
+        for point in points[1:]:
+            line.lineTo(point)
+        # The oldest end fades in, so a trace that has not filled the band yet has no hard start.
+        stroke = QLinearGradient(QPointF(points[0].x(), 0), QPointF(points[0].x() + 40, 0))
+        stroke.setColorAt(0, theme.color(color, 0))
+        stroke.setColorAt(1, theme.color(color, .32))
+        painter.setPen(QPen(stroke, 1.2))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(line)
+        painter.restore()
 
     def enterEvent(self, event):
         self.hover = 1.0
@@ -116,9 +159,14 @@ class AppTile(Tile):
         outer.setSpacing(0)
 
         top = QHBoxLayout()
+        top.setSpacing(6)
         self.dot = StateDot()
         top.addWidget(self.dot)
-        top.addStretch()
+        self.uptime = ElidedLabel()
+        self.uptime.setFont(theme.font(12, mono=True))
+        self.uptime.setStyleSheet(f"color: {theme.MUTED};")
+        self.uptime.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        top.addWidget(self.uptime, 1)
         self.more = IconButton("more", self.name)
         self.menu = QMenu(self.more)
         self.more.setMenu(self.menu)
@@ -130,10 +178,27 @@ class AppTile(Tile):
         outer.addLayout(top)
         outer.addStretch()
 
-        self.title = QLabel(self.name)
+        heading = QHBoxLayout()
+        heading.setSpacing(10)
+        self.title = ElidedLabel(self.name)
         self.title.setFont(theme.font(20, QFont.Weight.DemiBold))
         self.title.setStyleSheet(f"color: {theme.TEXT}; letter-spacing: -0.2px;")
-        outer.addWidget(self.title)
+        self.title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        heading.addWidget(self.title, 1)
+        self.rates = Rates()
+        heading.addWidget(self.rates, 0, Qt.AlignmentFlag.AlignBottom)
+        outer.addLayout(heading)
+        outer.addSpacing(2)
+        stats = QHBoxLayout()
+        stats.setSpacing(10)
+        self.server = ServerLabel()
+        self.server.revealed_changed.connect(lambda _: self._sync_compact())
+        stats.addWidget(self.server)
+        stats.addStretch()
+        self.total = TotalRate()  # Narrow tiles: the combined rate sits here instead of beside the name.
+        self.total.hide()
+        stats.addWidget(self.total)
+        outer.addLayout(stats)
         outer.addSpacing(6)
 
         row = QWidget()
@@ -172,7 +237,37 @@ class AppTile(Tile):
                                  " letter-spacing: -0.2px;")
         self._show_detail()
         self.switch.setToolTip(tr("vpn_off") if self.switch.isChecked() else tr("vpn_on"))
+        # A direct route does not leave through the VPN server, so its address would mislead there.
+        through_vpn = app.state in {"vpn", "partial"}
+        self.server.set_endpoint(*(split_endpoint(app.endpoint) if through_vpn else (None, None)))
+        self.uptime.setText(uptime_text(app.started_at) if running else "")
+        self.uptime.setToolTip(f"{tr('uptime_tip')} {uptime_text(app.started_at)}" if running and app.started_at else "")
+        if not running:
+            self.set_traffic(None, ())
         self.update()
+
+    def set_traffic(self, rates, history):
+        """rates: (down, up) bytes per second or None; history: recent totals for the trace."""
+        self.history = tuple(history)
+        if rates is None:
+            self.rates.set_rates("", "")
+            self.total.set_text("")
+        else:
+            self.rates.set_rates(rate_text(rates[0]), rate_text(rates[1]), (tr("download"), tr("upload")))
+            self.total.set_text(rate_text(rates[0] + rates[1]), self.rates.toolTip())
+        self.update()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._sync_compact()
+
+    def _sync_compact(self):
+        """Below a 260px card the rates collapse to one total beside the server line; a revealed
+        address needs that room, so the total steps aside until the address is masked again."""
+        compact = self.card_rect().width() < 260
+        self.rates.setVisible(not compact)
+        self.total.setVisible(compact and not self.server.revealed)
+        self.server.set_short(compact)
 
     def set_busy(self, label):
         """label names the action in progress (\"Starting…\"), or None when idle."""
@@ -544,6 +639,10 @@ class Window(QWidget):
         else:
             self.empty.hide()
             self.scroll.show()
+
+    def set_traffic(self, rates, history):
+        for name, tile in self.tiles.items():
+            tile.set_traffic(rates.get(name), history.get(name, ()))
 
     def set_busy(self, labels):
         """labels maps an app name to the action in progress."""

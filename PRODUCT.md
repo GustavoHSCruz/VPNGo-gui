@@ -35,6 +35,7 @@ Per-application routing: each app gets its own exit, and the rest of the system 
 
 v1 scope (confirmed):
 - Per app: status (stopped, on VPN, direct, partial), start, stop, VPN on/off, switch profile.
+- Per running app (asked for on 2026-10-22): running time, download/upload rate with a short traffic trace, and the VPN server address masked until clicked. On Linux the traffic is the app's namespace veth (VPN-encrypted bytes when on the VPN); on macOS and Windows it is the total of the app's open Mihomo connections.
 - Register a VPN profile from a WireGuard `.conf`, and register an app by executable.
 - Tray icon with quick actions per app; closing the window keeps the tray.
 - Language: pt-BR and English, following the system language and `VPNGO_LANG`, like the CLI.

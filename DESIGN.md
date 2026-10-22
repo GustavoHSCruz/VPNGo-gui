@@ -117,7 +117,7 @@ components:
     textColor: "{colors.text}"
     rounded: "{rounded.tile}"
     padding: "14px 14px 16px 18px"
-    height: "168px"
+    height: "196px"
   app-tile-stopped:
     backgroundColor: "{colors.stopped-surface}"
     textColor: "{colors.stopped-text}"
@@ -126,7 +126,26 @@ components:
     textColor: "{colors.muted}"
     typography: "{typography.body}"
     rounded: "{rounded.tile}"
-    height: "168px"
+    height: "196px"
+  tile-uptime:
+    textColor: "{colors.muted}"
+    typography: "{typography.data-small}"
+  tile-rates:
+    textColor: "{colors.muted}"
+    typography: "{typography.data-small}"
+    height: "28px"
+  tile-total-rate:
+    textColor: "{colors.muted}"
+    typography: "{typography.data-small}"
+    height: "18px"
+  server-line:
+    textColor: "{colors.muted}"
+    typography: "{typography.data-small}"
+    height: "18px"
+  server-line-hover:
+    textColor: "{colors.text}"
+  server-line-focus:
+    textColor: "{colors.route-green-focus}"
   route-switch:
     backgroundColor: "{colors.hairline}"
     rounded: "10px"
@@ -161,14 +180,14 @@ components:
 
 VPNGo is a small dark board the user opens from the tray, reads in one glance, and closes. Every managed app is a tile, and the tile's light is its route: lit green while the app is on the VPN, unlit warm grey on the direct route, amber when the route cannot be confirmed, and sunk into the ground, hollow-dotted and dimmed, when the app is stopped. Color is read before any word; text confirms what the light already said.
 
-The world is inherited, binding, from the owner's local search site: warm near-black neutrals, Inter for language, JetBrains Mono only for data, one connection color that carries state, 14px cards with an inset top highlight and a long soft shadow, and a faint radial glow at the top of the window that takes the overall state's color. Density is low and calm: three columns of 168px tiles at the default 760x520, generous inner space above the app name, nothing that looks like a settings table.
+The world is inherited, binding, from the owner's local search site: warm near-black neutrals, Inter for language, JetBrains Mono only for data, one connection color that carries state, 14px cards with an inset top highlight and a long soft shadow, and a faint radial glow at the top of the window that takes the overall state's color. Density is low and calm: three columns of 196px tiles at the default 760x520, generous inner space above the app name, nothing that looks like a settings table.
 
-Motion is state, never decoration. Route changes cross-fade the tile border, top tint and state dot over 600ms ease-out; the window glow follows the same curve; a busy app's dot breathes its halo on an 1100ms sine loop. Refresh never moves or rebuilds a tile under the pointer or a focused control.
+Motion is state, never decoration. Route changes cross-fade the tile border, top tint and state dot over 600ms ease-out; the window glow follows the same curve; a busy app's dot breathes its halo on an 1100ms sine loop. Refresh never moves or rebuilds a tile under the pointer or a focused control, and live figures never shift the layout: every rate sits in a fixed-width slot.
 
 **Key Characteristics:**
 - Warm near-black ground with a single semantic accent (route green), plus amber for unverifiable routes and coral for failures.
 - Tiles are the only shadowed objects; everything else is flat with 1px hairlines.
-- Inter for words, JetBrains Mono for profile names, paths and endpoints.
+- Inter for words, JetBrains Mono for data and measurements: profile names, paths, addresses, uptime and rates.
 - Pills and rounded rectangles only; no sharp corners anywhere.
 - State is painted (dots, switch fill, border tint), and every state change animates.
 
@@ -214,18 +233,21 @@ A warm charcoal palette where green is a signal, not a brand flourish.
 - **Body** (400, 14px): application default; the add-tile label, checkbox text, empty-state body.
 - **Label** (400, 13px): buttons, menu items, the summary pill (+0.2px), the tile detail line, dialog errors.
 - **Caption** (400, 12px): field captions above inputs, in muted.
-- **Data** (JetBrains Mono 400, 13px; 12px inside the tile detail line): profile names, file paths in inputs, the profile combo.
+- **Data** (JetBrains Mono 400, 13px): profile names, file paths in inputs, the profile combo.
+- **Data Small** (JetBrains Mono 400, 12px): the profile inside the tile detail line and every tile measurement: uptime, the ↓/↑ rates, the compact total and the server address.
 
 ### Named Rules
-**The Data Is Mono Rule.** Profile names, file paths and endpoints set in JetBrains Mono; route words, actions and labels set in Inter, even on the same line ("us · VPN"). One accepted exception, the owner's call: profile names inside QMenus (tile and tray menus) stay in Inter so they remain plain checkable items, one click deep and arrow-key navigable.
+**The Data Is Mono Rule.** Data and measurements set in JetBrains Mono: profile names, file paths, server addresses, uptime and transfer rates (units included, "58 kB/s", "4 h 59 min"). Route words, actions and labels set in Inter, even on the same line ("us · VPN"). One accepted exception, the owner's call: profile names inside QMenus (tile and tray menus) stay in Inter so they remain plain checkable items, one click deep and arrow-key navigable.
 
 ## Layout
 
 A responsive tile board inside a fixed top bar. The window opens at 760x520 (minimum 300x360) with a 20px edge on all sides. The top bar (16px top, 12px bottom) holds the wordmark left, then the summary pill and the "Perfis" pill right, 8px apart.
 
-The board lays tiles in as many columns as fit, 1 to 4, each at least 210px wide and exactly 168px tall, with a 14px column gap and a 22px row gap (the row gap leaves room for each tile's shadow). The dashed add tile always occupies the last cell. Tiles are moved, never rebuilt, when the column count changes. The floating message bar sits 20px from the sides and 16px from the bottom; the board gains bottom inset instead of reflowing.
+The board lays tiles in as many columns as fit, 1 to 4, each at least 210px wide and exactly 196px tall, with a 14px column gap and a 22px row gap (the row gap leaves room for each tile's shadow). The dashed add tile always occupies the last cell. Tiles are moved, never rebuilt, when the column count changes. The floating message bar sits 20px from the sides and 16px from the bottom; the board gains bottom inset instead of reflowing.
 
-Tile interior: 18px left, 14px top/right, 16px bottom; state dot and overflow button on top, a flexible gap, then the title, 6px, and a 28px detail row (detail text, 10px, switch or start button). Dialogs: 420px minimum width, 24/22/24/20 padding, field caption 6px above its control, 10px between fields, actions right-aligned with 8px between.
+Tile interior: 18px left, 14px top/right, 16px bottom. Top row: state dot, 6px, uptime (taking the free width), overflow button. A flexible gap (where the traffic trace lives), then the heading row (title, 10px, rates on wide cards), 2px, the 18px server line (address left, compact total right), 6px, and a 28px detail row (detail text, 10px, switch or start button).
+
+**The Compact Card Rule.** A card narrower than 260px is compact: the stacked ↓/↑ rates beside the name collapse into one combined total at the right of the server line, and the masked address shortens to one bullet per hidden part (146.70.•.•). A revealed address needs that room, so the total steps aside while the address is shown. The switch is the card's width, measured on every resize, not the window's. Dialogs: 420px minimum width, 24/22/24/20 padding, field caption 6px above its control, 10px between fields, actions right-aligned with 8px between.
 
 ## Elevation & Depth
 
@@ -277,6 +299,21 @@ The searxng switch: a 34x20 track (10px radius) that fills from hairline to gree
 ### State Dot (signature)
 A 7px light with a 13px halo at 22% alpha in the state color. Stopped is a hollow 1px ring; busy breathes the halo (22% to 47% alpha, 6.5px to 8px radius). Color changes cross-fade over 600ms.
 
+### Uptime
+How long the app has run, quiet in the top row: Data Small in muted ("23 min", "4 h 59 min", "2 d 3 h"), elided with "…" when the row is short, the full value in its tooltip. Running apps only; a stopped tile's top row holds just the hollow dot.
+
+### Rates
+Download over upload, stacked in two 14px lines right of the app name on cards 260px and wider, bottom-aligned with the title. Data Small in muted, right-aligned, each followed by a drawn 10px arrow icon (↓ then ↑, never a glyph). The slot is fixed at the width of "000 kB/s" plus the arrow, so the title's cut point never moves between refreshes; empty until a first rate is known.
+
+### Compact Total
+On compact cards (under 260px) the rates become one figure: the ↓↑ drawn icon pair, then download plus upload as one rate, Data Small in muted, in an 18px slot of the same fixed width at the right of the server line. Its tooltip carries the separate figures. It hides while the address is revealed.
+
+### Server Line
+The VPN server address under the app name, Data Small, masked by default to keep the network part readable (146.70.•••.•••; 146.70.•.• on compact cards; IPv6 keeps two groups then •••). Click, Enter or Space toggles the full address; the tooltip then gives the port. Muted at rest, text on hover, route-green-focus when keyboard-focused. Shown only while the app's route is VPN or partial: a direct route does not leave through that server, so the line is empty there.
+
+### Traffic Trace (signature)
+The last two minutes of traffic (40 samples, one per 3s refresh) as a faint area behind the tile's empty middle, in the band from 44px below the card top to mid-card, so it never runs under text. Area filled top to bottom from 10% to 0 alpha, topped by a 1.2px line at 32% alpha whose oldest 40px fade in from nothing. Its colour is muted mixed toward the route accent by the route strength, so it rides the same 600ms cross-fade as the border. Drawn only once 20 of 40 samples exist, only on running tiles, and never when every sample is under 4 KiB/s: a flat idle line would read as a divider. Scaled to the peak, never below 16 KiB/s; clipped to the 14px card shape.
+
 ### Message Bar
 A floating 12px-radius bar over the board's bottom: state dot, wrapping selectable text, dismiss button. Success is tinted green and leaves after 6s; errors are tinted coral and stay until dismissed.
 
@@ -288,7 +325,8 @@ A dashed hairline slot the size of a tile, centred plus icon and "Adicionar app"
 ### Do:
 - **Do** let the tile itself carry the route: border, top tint and dot change together over 600ms ease-out.
 - **Do** derive new tones by mixing palette colors (the Mixed, Not Invented Rule) instead of adding hexes.
-- **Do** set profile names, paths and endpoints in JetBrains Mono and every word around them in Inter.
+- **Do** set profile names, paths, addresses, uptime and rates in JetBrains Mono and every word around them in Inter.
+- **Do** give every live figure a fixed-width slot ("000 kB/s") so refreshes never move the text beside it.
 - **Do** keep a stopped app visibly sunk: no shadow, no highlight, dimmed title, hollow dot, "Iniciar" in place of the switch.
 - **Do** keep at most one bone primary button per view; everything else is a ghost pill.
 - **Do** update state in place; never move or rebuild a tile, menu or control the user is pointing at or focused on.
