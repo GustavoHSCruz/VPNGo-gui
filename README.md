@@ -2,7 +2,7 @@
 
 A tray app and window for [vpngo](https://github.com/GustavoHSCruz/VPNGo), the launcher that routes individual apps through WireGuard. Each app is a tile lit by its route: green on the VPN, unlit on the direct route, hollow when stopped.
 
-A running app's tile also shows how long it has been on its current route (and, when it fits, its total on the other one), its download and upload rates over a faint trace that is green where traffic went through the VPN and grey where it went direct, and an address masked until you click it: the VPN server's, or on the direct route your public IP, looked up only when you click. Each app shows its own icon. With one or two apps, the tiles open into a detail view with the time on each route and the data moved since the last switch.
+A running app's tile also shows how long it has been on its current route (and, when it fits, its total on the other one), its download and upload rates over a faint trace that is green where traffic went through the VPN and grey where it went direct, and an address masked until you click it: the VPN server's, or on the direct route your public IP, looked up only when you click. Each app shows its own icon. Its tooltip adds the total on each route and the data moved since the last switch.
 
 From the window or the tray you can:
 

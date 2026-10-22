@@ -17,12 +17,8 @@ from .widgets import (ElidedLabel, IconButton, PillButton, Rates, RouteSwitch, S
 
 
 TILE_HEIGHT = 196
-LARGE_HEIGHT = 330      # A tile with room for its whole story: few apps get these.
 TILE_MIN_WIDTH = 210
-LARGE_MIN_WIDTH = 460
-SLIM_HEIGHT = 56        # The add tile under large tiles: a line, not another card.
 HEADER_HEIGHT = 46
-FEW = 2                 # Up to this many apps, each tile opens into the detail view.
 SIDE = 7     # Room beside each tile; two of them make the 14px column gap.
 TOP = 2      # Room above; with BELOW it makes the 22px row gap.
 BELOW = 20   # Room below for the long soft shadow.
@@ -47,6 +43,8 @@ def route_texts(app):
     if app.vpn_seconds is not None:
         lines += [tr("total_vpn", time=duration_text(app.vpn_seconds)),
                   tr("total_direct", time=duration_text(app.direct_seconds))]
+    if app.route_rx_bytes is not None:
+        lines.append(f"{tr('fact_data')}: ↓ {bytes_text(app.route_rx_bytes)} ↑ {bytes_text(app.route_tx_bytes or 0)}")
     if app.started_at:
         lines.append(tr("open_for", time=uptime_text(app.started_at)))
     if not since:
@@ -80,7 +78,6 @@ class Tile(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.large = False
         self.setFixedHeight(TILE_HEIGHT + TOP + BELOW)
         self.setMinimumWidth(TILE_MIN_WIDTH + 2 * SIDE)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -91,20 +88,12 @@ class Tile(QWidget):
         self.hover = 0.0
         self.history = ()   # (total rate, route) samples, oldest first: drawn as the tile's traffic trace.
 
-    def set_large(self, large):
-        if large != self.large:
-            self.large = large
-            self.setFixedHeight((LARGE_HEIGHT if large else TILE_HEIGHT) + TOP + BELOW)
-            self.setMinimumWidth((LARGE_MIN_WIDTH if large else TILE_MIN_WIDTH) + 2 * SIDE)
-            self.update()
-
     def card_rect(self):
         return QRectF(self.rect()).adjusted(SIDE, TOP, -SIDE, -BELOW)
 
     def trace_band(self, card):
         """Between the top row and the app name, so the trace never runs under text."""
-        bottom = card.height() - 176 if self.large else card.height() * .5
-        return QRectF(card.left() + 1, card.top() + 44, card.width() - 2, bottom - 44)
+        return QRectF(card.left() + 1, card.top() + 44, card.width() - 2, card.height() * .5 - 44)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -139,8 +128,8 @@ class Tile(QWidget):
     def _paint_trace(self, painter, card):
         """Recent traffic as a faint area behind the text: green where it went through the VPN,
         grey where it went direct, amber where the route was incomplete."""
-        from .stats import HISTORY, LONG_HISTORY, QUIET
-        span = LONG_HISTORY if self.large else HISTORY
+        from .stats import HISTORY, QUIET
+        span = HISTORY
         samples = list(self.history)[-span:]
         values = [value for value, _ in samples]
         # Half a tile's window of history before drawing, and nothing for an idle app: a flat line reads as a divider.
@@ -197,47 +186,6 @@ class Tile(QWidget):
         self.hover = 0.0
         self.update()
         super().leaveEvent(event)
-
-
-class Facts(QWidget):
-    """The detail view's figures: time on this route, on each route in total, and the data it moved."""
-
-    KEYS = ("fact_route", "fact_vpn", "fact_direct", "fact_data")
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        grid = QGridLayout(self)
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(16)
-        grid.setVerticalSpacing(3)
-        self.values = []
-        for column, key in enumerate(self.KEYS):
-            caption = QLabel(tr(key))
-            caption.setFont(theme.font(12))
-            caption.setStyleSheet(f"color: {theme.MUTED};")
-            value = ElidedLabel()
-            value.setFont(theme.font(13, mono=True))
-            value.setStyleSheet(f"color: {theme.TEXT};")
-            value.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-            grid.addWidget(caption, 0, column)
-            grid.addWidget(value, 1, column)
-            grid.setColumnStretch(column, 2 if key == "fact_data" else 1)
-            self.values.append(value)
-        self.setFixedHeight(40)
-
-    def set_app(self, app):
-        since = app.route_since or app.started_at
-        data = ""
-        if app.route_rx_bytes is not None:
-            data = f"↓ {bytes_text(app.route_rx_bytes)} ↑ {bytes_text(app.route_tx_bytes or 0)}"
-        texts = (uptime_text(since) if app.running and since else "—",
-                 duration_text(app.vpn_seconds) if app.vpn_seconds is not None else "—",
-                 duration_text(app.direct_seconds) if app.direct_seconds is not None else "—",
-                 data or "—")
-        for label, text in zip(self.values, texts):
-            if label.text() != text:
-                label.setText(text)
-                label.setToolTip("")
 
 
 class AppTile(Tile):
@@ -301,11 +249,6 @@ class AppTile(Tile):
         self.total.hide()
         stats.addWidget(self.total)
         outer.addLayout(stats)
-        self.facts = Facts()
-        self.facts_gap = outer.count()
-        outer.addSpacing(0)
-        outer.addWidget(self.facts)
-        self.facts.hide()
         outer.addSpacing(6)
 
         row = QWidget()
@@ -328,13 +271,6 @@ class AppTile(Tile):
         bottom.addWidget(self.start)
         outer.addWidget(row)
         self.update_app(app, (), animate=False)
-
-    def set_large(self, large):
-        super().set_large(large)
-        self.facts.setVisible(large)
-        # Without the figures, their spacing would push the name up for nothing.
-        self.layout().itemAt(self.facts_gap).spacerItem().changeSize(0, 14 if large else 0)
-        self.layout().invalidate()
 
     def update_app(self, app, profiles, groups=(), platform="", manages=False, animate=True):
         """manages: vpngo can group and remove apps (0.7.0 and later)."""
@@ -370,7 +306,6 @@ class AppTile(Tile):
             self.server.set_endpoint(None, None)
         self.route_text = route_texts(app)
         self._fit_route_text()
-        self.facts.set_app(app)
         if not running:
             self.set_traffic(None, ())
         self.update()
@@ -567,21 +502,13 @@ class AddTile(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.slim = None
-        self.set_slim(False)
+        self.setFixedHeight(TILE_HEIGHT + TOP + BELOW)
+        self.setMinimumWidth(TILE_MIN_WIDTH + 2 * SIDE)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAccessibleName(tr("add_app"))
         self.hover = False
-
-    def set_slim(self, slim):
-        """Under large tiles the add tile is a single line across the board."""
-        if slim != self.slim:
-            self.slim = slim
-            self.setFixedHeight((SLIM_HEIGHT if slim else TILE_HEIGHT) + TOP + BELOW)
-            self.setMinimumWidth(TILE_MIN_WIDTH + 2 * SIDE)
-            self.update()
 
     def enterEvent(self, event):
         self.hover = True
@@ -770,7 +697,7 @@ class Summary(QWidget):
 class Board(QWidget):
     """Lays the tiles out in as many columns as fit, moving tiles instead of rebuilding them.
 
-    Items are (widget, wide) pairs: a wide item (a group header, the slim add tile) takes a
+    Items are (widget, wide) pairs: a wide item (a group header) takes a
     row of its own across every column.
     """
 
@@ -783,7 +710,6 @@ class Board(QWidget):
         self.grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.items = []
         self.min_width = TILE_MIN_WIDTH
-        self.most = 4       # Never more columns than this: one large tile spans the whole board.
         self.columns = 0
 
     def set_bottom_inset(self, inset):
@@ -791,11 +717,11 @@ class Board(QWidget):
         margins = self.grid.contentsMargins()
         self.grid.setContentsMargins(margins.left(), margins.top(), margins.right(), self.base_bottom + inset)
 
-    def set_items(self, items, min_width=TILE_MIN_WIDTH, most=4):
-        if items == self.items and (min_width, most) == (self.min_width, self.most):
+    def set_items(self, items, min_width=TILE_MIN_WIDTH):
+        if items == self.items and min_width == self.min_width:
             return
         self.items = items
-        self.min_width, self.most = min_width, most
+        self.min_width = min_width
         self.columns = 0
         self.relayout()
 
@@ -804,7 +730,7 @@ class Board(QWidget):
         self.relayout()
 
     def columns_for(self, width):
-        return max(1, min(self.most, (width - 2 * (20 - SIDE)) // (self.min_width + 2 * SIDE)))
+        return max(1, min(4, (width - 2 * (20 - SIDE)) // (self.min_width + 2 * SIDE)))
 
     def content_height(self, width):
         """The board's height at this width: what the window needs to show every tile."""
@@ -1012,7 +938,6 @@ class Window(QWidget):
         for name in list(self.tiles):
             if name not in by_name:
                 self.tiles.pop(name).deleteLater()
-        large = 0 < len(snapshot.apps) <= FEW
         group_names = tuple(name for name, _ in snapshot.groups)
         items, grouped = [], set()
         for group, members in snapshot.groups:
@@ -1037,13 +962,10 @@ class Window(QWidget):
         items += [(self._tile(app), False) for app in rest]
         for app in snapshot.apps:
             tile = self.tiles[app.name]
-            tile.set_large(large)
             tile.update_app(app, snapshot.profiles, group_names, snapshot.platform, snapshot.manages, animate=animate)
-        self.add_tile.set_slim(large)
-        items.append((self.add_tile, large))
+        items.append((self.add_tile, False))
         self.other_header.setVisible(bool(grouped and rest))
-        self.board.set_items(items, LARGE_MIN_WIDTH if large else TILE_MIN_WIDTH,
-                             len(snapshot.apps) if large else 4)
+        self.board.set_items(items)
         self.summary.set_counts(snapshot.on_vpn, len(snapshot.apps))
         self.glow.go(1.0 if snapshot.on_vpn else 0.0, animate)
         if not snapshot.profiles and not snapshot.apps:
@@ -1064,10 +986,6 @@ class Window(QWidget):
             return
         area = self.screen().availableGeometry() if self.screen() else QRectF(0, 0, 1280, 900).toRect()
         width = self.width()
-        apps = len(self.snapshot.apps)
-        if 1 < apps <= FEW:
-            # Side by side rather than stacked: a pair of detail tiles reads as a comparison.
-            width = max(width, min(int(area.width() * .9), apps * (LARGE_MIN_WIDTH + 2 * SIDE) + 2 * (20 - SIDE)))
         bar = 62
         height = bar + self.board.content_height(width) + 12
         self.resize(width, max(self.minimumHeight(), min(int(area.height() * .85), height)))

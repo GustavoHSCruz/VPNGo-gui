@@ -241,11 +241,9 @@ A warm charcoal palette where green is a signal, not a brand flourish.
 
 ## Layout
 
-A responsive tile board inside a fixed top bar. The window opens 760px wide (minimum 300x360) with a 20px edge on all sides, as tall as its tiles need (up to 85% of the screen) and only after vpngo's first answer, so it never opens mostly empty and then grows; with two apps it opens wide enough for their detail tiles to sit side by side. Once the user resizes it, the saved size wins. The top bar (16px top, 12px bottom, 14px right) holds the wordmark left, then the summary pill, the "Perfis" pill and the settings icon button right, 8px apart.
+A responsive tile board inside a fixed top bar. The window opens 760px wide (minimum 300x360) with a 20px edge on all sides, as tall as its tiles need (up to 85% of the screen) and only after vpngo's first answer, so it never opens mostly empty and then grows. A tiling window manager may size it anyway. Once the user resizes it, the saved size wins. The top bar (16px top, 12px bottom, 14px right) holds the wordmark left, then the summary pill, the "Perfis" pill and the settings icon button right, 8px apart.
 
 The board lays tiles in as many columns as fit, 1 to 4, each at least 210px wide and exactly 196px tall, with a 14px column gap and a 22px row gap (the row gap leaves room for each tile's shadow). The dashed add tile always occupies the last cell. Groups put a 46px heading row across every column before their tiles; when groups exist, the remaining apps follow under an "Outros apps" heading. Tiles are moved, never rebuilt, when the column count changes. The floating message bar sits 20px from the sides and 16px from the bottom; the board gains bottom inset instead of reflowing.
-
-**The Few Apps Rule.** With one or two apps, every tile opens into the detail view: 330px tall, at least 460px wide, never more columns than apps (a single app spans the board), its trace drawn over ten minutes in a band from 44px below the top to 176px above the bottom, and a row of four figures above the detail row. The add tile becomes a 56px dashed line across the board. A board of a few apps reads as their story, not as empty space.
 
 Tile interior: 18px left, 14px top/right, 16px bottom. Top row: state dot, 6px, uptime (taking the free width), overflow button. A flexible gap (where the traffic trace lives), then the heading row (title, 10px, rates on wide cards), 2px, the 18px server line (address left, compact total right), 6px, and a 28px detail row (detail text, 10px, switch or start button).
 
@@ -302,10 +300,7 @@ The searxng switch: a 34x20 track (10px radius) that fills from hairline to gree
 A 7px light with a 13px halo at 22% alpha in the state color. Stopped is a hollow 1px ring; busy breathes the halo (22% to 47% alpha, 6.5px to 8px radius). Color changes cross-fade over 600ms.
 
 ### Route Time
-How long the app has been on its current route (since it was last switched, not since it opened), quiet in the top row: Data Small in muted ("23 min", "4 h 59 min", "2 d 3 h"). When the whole line fits, the other route's total follows after a spaced middle dot ("10 min  ·  VPN 15 h 36 min"); when it does not, only the current figure shows, never a cut one. The tooltip lists the time on this route, the total on each route and how long the app has been open. Running apps only; a stopped tile's top row holds just the hollow dot.
-
-### Facts (detail view)
-Four columns under the address line of a detail tile: "Nesta rota", "VPN no total", "Direto no total" (captions 12px Inter muted) and "Dados nesta rota" (twice as wide), values in 13px JetBrains Mono text color ("↓ 39 MB ↑ 2,1 MB"), 3px between caption and value, 16px between columns, elided rather than wrapped.
+How long the app has been on its current route (since it was last switched, not since it opened), quiet in the top row: Data Small in muted ("23 min", "4 h 59 min", "2 d 3 h"). When the whole line fits, the other route's total follows after a spaced middle dot ("10 min  ·  VPN 15 h 36 min"); when it does not, only the current figure shows, never a cut one. The tooltip lists the time on this route, the total on each route, the data moved on this route and how long the app has been open. Running apps only; a stopped tile's top row holds just the hollow dot.
 
 ### Rates
 Download over upload, stacked in two 14px lines right of the app name on cards 260px and wider, bottom-aligned with the title. Data Small in muted, right-aligned, each followed by a drawn 10px arrow icon (↓ then ↑, never a glyph). The slot is fixed at the width of "000 kB/s" plus the arrow, so the title's cut point never moves between refreshes; empty until a first rate is known.
@@ -320,7 +315,7 @@ The address under the app name, Data Small, masked by default to keep the networ
 The app's own icon, 24px, left of the title with a 10px gap: its desktop entry's icon on Linux (matched by entry file name first, then the program it runs, then its name), the executable's icon on macOS and Windows. Absent when none is found; the title then starts at the edge as before.
 
 ### Traffic Trace (signature)
-The last two minutes of traffic (40 samples, one per 3s refresh; ten minutes, 200 samples, in the detail view) as a faint area behind the tile's empty middle, in the band from 44px below the card top to mid-card, so it never runs under text. Area filled top to bottom from 10% to 0 alpha, topped by a 1.2px line at 32% alpha whose oldest 40px fade in from nothing. Each stretch is coloured by the route its samples took: green on the VPN, muted grey on the direct route, amber where the route was partial; a stretch starts at the previous one's last point, so the line never breaks. Drawn only once 20 samples exist, only on running tiles, and never when every sample is under 4 KiB/s: a flat idle line would read as a divider. Scaled to the peak, never below 16 KiB/s; clipped to the 14px card shape. The samples survive a restart of under two minutes (an update), not a day off.
+The last two minutes of traffic (40 samples, one per 3s refresh) as a faint area behind the tile's empty middle, in the band from 44px below the card top to mid-card, so it never runs under text. Area filled top to bottom from 10% to 0 alpha, topped by a 1.2px line at 32% alpha whose oldest 40px fade in from nothing. Each stretch is coloured by the route its samples took: green on the VPN, muted grey on the direct route, amber where the route was partial; a stretch starts at the previous one's last point, so the line never breaks. Drawn only once 20 samples exist, only on running tiles, and never when every sample is under 4 KiB/s: a flat idle line would read as a divider. Scaled to the peak, never below 16 KiB/s; clipped to the 14px card shape. The samples survive a restart of under two minutes (an update), not a day off.
 
 ### Group Heading
 A 46px row across the board above a group's tiles, aligned with the cards' left edge: the group name in 14px Inter 600, the count "1 de 2 na VPN" in Data Small muted (the busy word while the group acts), then right-aligned a route switch (on when every app in the group is on the VPN) and an overflow menu (turn all on, turn all off, stop all, the profile list, delete the group). The "Outros apps" heading is the name alone, in muted.
@@ -332,7 +327,7 @@ A floating 12px-radius bar over the board's bottom: state dot, wrapping selectab
 A 32px icon button (sliders) at the right of the top bar opens a menu: language (Automatic, Português (Brasil), English; choosing one rebuilds the window in place), start with the system, notify when an app leaves the VPN without being asked, the version, and either "Procurar atualizações" or "Atualizar para x.y.z".
 
 ### Add Tile
-A dashed hairline slot the size of a tile (a 56px line across the board in the detail view), centred plus icon and "Adicionar app" in 14px muted; hover brightens the border toward muted with a 2% white fill, focus tints it toward green.
+A dashed hairline slot the size of a tile, centred plus icon and "Adicionar app" in 14px muted; hover brightens the border toward muted with a 2% white fill, focus tints it toward green.
 
 ## Do's and Don'ts
 

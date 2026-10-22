@@ -9,8 +9,7 @@ from collections import deque
 from .i18n import language, tr
 
 
-HISTORY = 40        # Samples a tile draws: about two minutes at the 3 s refresh.
-LONG_HISTORY = 200  # Samples kept per app, about ten minutes: the detail view draws them all.
+HISTORY = 40        # Samples kept per app: about two minutes at the 3 s refresh.
 QUIET = 4 * 1024    # Rates below this still draw a flat line, not a noisy one.
 RESUME = 120        # Seconds a saved history stays good: covers a restart, not a day off.
 
@@ -36,7 +35,7 @@ class Traffic:
                 continue
             previous = self.last.get(app.name)
             self.last[app.name] = (now, app.rx_bytes, app.tx_bytes)
-            history = self.history.setdefault(app.name, deque(maxlen=LONG_HISTORY))
+            history = self.history.setdefault(app.name, deque(maxlen=HISTORY))
             if previous is None or now <= previous[0]:
                 continue
             elapsed = now - previous[0]
@@ -66,7 +65,7 @@ class Traffic:
                 return
             for name, samples in data["apps"].items():
                 self.history[str(name)] = deque(((float(value), str(state)) for value, state in samples),
-                                                maxlen=LONG_HISTORY)
+                                                maxlen=HISTORY)
         except (OSError, ValueError, KeyError, TypeError):
             self.history.clear()
 

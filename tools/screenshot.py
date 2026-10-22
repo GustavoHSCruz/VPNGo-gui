@@ -170,41 +170,10 @@ def main(out):
     first.grab().save(str(out / "tray-app-menu.png"))
     shot("no-profiles", {"profiles": [], "apps": []})
 
-    # Few apps: the detail view. First the case that prompted it: one app, on the direct route.
-    TRAFFIC.clear()
-    TRAFFIC["vesktop"] = ((286, 176), trace(lambda i: 600 + 9_000 * max(0, math.sin(i / 9)) ** 8 + 300 * (i % 3),
-                                            200, direct_from=150))
+    # One app on the direct route, the case that prompted the route clock, in a tiled window.
     single = {**DEMO["apps"][0], "state": "direct", "route_since": NOW - 10 * 60,
-              "vpn_seconds": 15 * 3600 + 36 * 60, "direct_seconds": 10 * 60,
-              "route_rx_bytes": 38_949_877, "route_tx_bytes": 2_140_000}
-    one = gui.Window()
-    one.resize(1100, 520)
-    one.show()
-    one.show_snapshot(parse_snapshot(json.dumps({"schema": 1, "profiles": ["br", "us"], "apps": [single],
-                                                 "groups": []})), animate=False)
-    one.set_traffic({"vesktop": TRAFFIC["vesktop"][0]}, {"vesktop": TRAFFIC["vesktop"][1]})
-    one.fit_to_content()
-    settle()
-    one.grab().save(str(out / "detail-one.png"))
-    one.tiles["vesktop"].set_public_ip("203.0.113.7")
-    one.tiles["vesktop"].server.toggle()
-    settle(200)
-    one.grab().save(str(out / "detail-one-ip.png"))
-    one.close()
-    TRAFFIC["firefox"] = ((1_240_000, 61_000), trace(lambda i: 200_000 + 900_000 * max(0, math.sin(i / 14)) ** 2,
-                                                     200, direct_from=60, direct_until=120))
-    two = {"profiles": ["br", "us"], "apps": [{**single, "route_since": NOW - 10 * 60}, {
-        **DEMO["apps"][1], "route_rx_bytes": 410_000_000, "route_tx_bytes": 12_500_000}], "groups": []}
-    pair = gui.Window()
-    pair.resize(760, 520)
-    pair.show()
-    pair.show_snapshot(parse_snapshot(json.dumps({"schema": 1, **two})), animate=False)
-    pair.set_traffic({name: rates for name, (rates, _) in TRAFFIC.items()},
-                     {name: history for name, (_, history) in TRAFFIC.items()})
-    pair.fit_to_content()
-    settle()
-    pair.grab().save(str(out / "detail-two.png"))
-    pair.close()
+              "vpn_seconds": 15 * 3600 + 36 * 60, "direct_seconds": 10 * 60}
+    shot("one-direct", {"profiles": ["br", "us"], "apps": [single]}, size=(600, 1016))
     TRAFFIC.clear()
     TRAFFIC.update(saved)
 

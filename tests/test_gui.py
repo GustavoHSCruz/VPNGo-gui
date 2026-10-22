@@ -279,19 +279,14 @@ class WindowTest(FakeCli):
         self.assertEqual(server.text(), "146.70.•••.•••")
         self.assertEqual(controller.window.tiles["spotify"].server.text(), "")
 
-    def test_few_apps_open_into_the_detail_view(self):
+    def test_window_opens_as_tall_as_its_tiles(self):
         data = json.loads(self.state.read_text())
         data["apps"] = data["apps"][:1]
-        data["apps"][0].update(route_since=time.time() - 60, vpn_seconds=60, direct_seconds=0,
-                               route_rx_bytes=39_000_000, route_tx_bytes=2_100_000, rx_bytes=1, tx_bytes=1)
         self.state.write_text(json.dumps(data))
         controller = self.controller()
-        tile = controller.window.tiles["vesktop"]
-        self.assertTrue(tile.large)
-        self.assertTrue(controller.window.add_tile.slim)
-        self.assertEqual(tile.facts.values[3].text(), "↓ 39 MB ↑ 2.1 MB")
+        controller.window.resize(760, 900)
         controller.window.fit_to_content()
-        self.assertLess(controller.window.height(), 560)
+        self.assertLess(controller.window.height(), 400)
 
     def test_groups_gather_tiles_and_act_as_one(self):
         data = json.loads(self.state.read_text())
