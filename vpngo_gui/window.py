@@ -395,6 +395,14 @@ class EmptyState(QWidget):
         layout.addLayout(row)
         layout.addStretch(3)
 
+    def resizeEvent(self, event):
+        # Keep the explanation to a readable measure (about 460px) by widening the side margins.
+        super().resizeEvent(event)
+        side = max(32, (self.width() - 460) // 2)
+        margins = self.layout().contentsMargins()
+        if margins.left() != side:
+            self.layout().setContentsMargins(side, margins.top(), side, margins.bottom())
+
     def show_message(self, title, body, button=None):
         self.title.setText(title)
         self.body.setText(body)
@@ -470,6 +478,7 @@ class Summary(QWidget):
         layout.addWidget(self.dot)
         layout.addWidget(self.label)
         self.setFixedHeight(34)
+        self.hide()  # Until there are apps to count.
 
     def set_counts(self, on, total):
         self.setVisible(total > 0)
@@ -532,6 +541,7 @@ class Window(QWidget):
     app_action = Signal(str, str, object)
     add_app = Signal()
     add_profile = Signal()
+    get_engine = Signal()
 
     def __init__(self):
         super().__init__()
@@ -548,6 +558,7 @@ class Window(QWidget):
         layout.setSpacing(0)
         bar = QHBoxLayout()
         bar.setContentsMargins(20, 16, 20, 12)
+        bar.addStrut(34)  # Same height with or without the pills, so the wordmark never moves.
         bar.setSpacing(8)
         wordmark = QLabel("VPNGo")
         wordmark.setFont(theme.font(15, QFont.Weight.DemiBold))
@@ -586,11 +597,17 @@ class Window(QWidget):
         for keys in (QKeySequence(Qt.Key.Key_Escape), QKeySequence.StandardKey.Close):
             QShortcut(keys, self, activated=self.close)
         self.snapshot = None
+        self.engine_missing = False
         self._profiles = ()
         self._fill_profiles_menu(())
 
     def _empty_action(self):
-        (self.add_profile if self.snapshot is not None and not self.snapshot.profiles else self.add_app).emit()
+        if self.engine_missing:
+            self.get_engine.emit()
+        elif self.snapshot is not None and not self.snapshot.profiles:
+            self.add_profile.emit()
+        else:
+            self.add_app.emit()
 
     def _fill_profiles_menu(self, profiles):
         self.profiles_menu.clear()
@@ -603,11 +620,28 @@ class Window(QWidget):
         self.profiles_menu.addAction(tr("add_profile"), self.add_profile.emit)
 
     def show_unavailable(self, text):
+        self.engine_missing = False
+        self.summary.hide()
+        self.profiles_button.hide()
         self.scroll.hide()
         self.empty.show_message("VPNGo", text)
         self.empty.show()
 
+    def show_engine_missing(self, downloading=False):
+        """No vpngo anywhere: offer the interface's own copy (its engine)."""
+        self.engine_missing = True
+        self.summary.hide()
+        self.profiles_button.hide()
+        self.scroll.hide()
+        self.empty.show_message(tr("engine_title"), tr("engine_downloading") if downloading else tr("engine_body"),
+                                tr("get_engine"))
+        self.empty.button.setEnabled(not downloading)
+        self.empty.show()
+
     def show_snapshot(self, snapshot, animate=True):
+        self.engine_missing = False
+        self.empty.button.setEnabled(True)
+        self.profiles_button.show()
         first = self.snapshot is None
         self.snapshot = snapshot
         animate = animate and not first

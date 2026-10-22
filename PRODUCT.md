@@ -29,7 +29,7 @@ Per-application routing: each app gets its own exit, and the rest of the system 
 - Lives in the system tray; the window is opened briefly and closed again.
 - State comes from `vpngo status --json`, which needs no administrator password, and is refreshed periodically.
 - Actions run `vpngo` commands. On Linux and macOS some ask for the sudo password; the GUI asks for it in its own dialog (sudo askpass). On Windows, Windows itself shows the UAC prompt.
-- Installed by `vpngo --install-gui`, which downloads this project's release, verifies it and installs it in a private virtual environment.
+- Installed by `vpngo --install-gui`, or without vpngo by this project's `install.py`, which uses a compatible vpngo on PATH or downloads vpngo as the interface's private engine (not on PATH). Either way the release is verified and installed in a private virtual environment.
 
 ## Capabilities and Constraints
 

@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from .i18n import language
 
@@ -45,6 +44,7 @@ class Snapshot:
     profiles: tuple = ()
     apps: tuple = ()
     platform: str = field(default=sys.platform)
+    version: str = ""
 
     @property
     def on_vpn(self):
@@ -72,7 +72,7 @@ def parse_snapshot(text):
                         started_at=number(item.get("started_at")), endpoint=item.get("endpoint") or None,
                         rx_bytes=number(item.get("rx_bytes"), int), tx_bytes=number(item.get("tx_bytes"), int)))
     return Snapshot(profiles=tuple(str(name) for name in data.get("profiles", [])), apps=tuple(apps),
-                    platform=str(data.get("platform", sys.platform)))
+                    platform=str(data.get("platform", sys.platform)), version=str(data.get("version", "")))
 
 
 class CommandError(Exception):
@@ -81,8 +81,9 @@ class CommandError(Exception):
 
 def command():
     """The vpngo command recorded by `vpngo --install-gui`, else vpngo on PATH."""
+    from .engine import prefix
     override = os.environ.get("VPNGO_GUI_CLI")
-    recorded = Path(__file__).resolve().parents[2] / "cli.json"
+    recorded = prefix() / "cli.json"
     if override:
         return json.loads(override) if override.startswith("[") else [override]
     if recorded.is_file():
@@ -91,6 +92,15 @@ def command():
     if not found:
         raise CommandError("vpngo-missing")
     return [found]
+
+
+def private_engine_in_use():
+    """True when the interface runs its own downloaded engine rather than an installed vpngo."""
+    from .engine import prefix
+    try:
+        return str(prefix() / "engine") in " ".join(command())
+    except CommandError:
+        return False
 
 
 def run(arguments, environment=None, timeout=120):

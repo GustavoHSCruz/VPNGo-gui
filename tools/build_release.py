@@ -57,9 +57,16 @@ def main():
                                capture_output=True, text=True).stdout.strip())
     args.out.mkdir(parents=True, exist_ok=True)
     name, data = archive(args.version, epoch)
-    (args.out / name).write_bytes(data)
-    (args.out / "SHA256SUMS").write_text(f"{hashlib.sha256(data).hexdigest()}  {name}\n", encoding="utf-8")
-    print(f"Built {name} and SHA256SUMS in {args.out}")
+    # The standalone installer is the engine module itself: it finds or downloads vpngo, then
+    # has it install the interface.
+    installer = (ROOT / "vpngo_gui/engine.py").read_bytes()
+    assets = {name: data, "install.py": installer}
+    lines = []
+    for asset, content in sorted(assets.items()):
+        (args.out / asset).write_bytes(content)
+        lines.append(f"{hashlib.sha256(content).hexdigest()}  {asset}\n")
+    (args.out / "SHA256SUMS").write_text("".join(lines), encoding="utf-8")
+    print(f"Built {name}, install.py and SHA256SUMS in {args.out}")
     return 0
 
 

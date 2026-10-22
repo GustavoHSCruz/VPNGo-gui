@@ -36,6 +36,7 @@ INSTANCE = f"vpngo-gui-{os.getuid() if hasattr(os, 'getuid') else os.environ.get
 class Results(QObject):
     snapshot = Signal(object, object)          # Snapshot or None, error text or None
     finished = Signal(str, str, object)        # app name, action text, error text or None
+    engine = Signal(object)                    # error text or None
 
 
 class Controller(QObject):
@@ -49,6 +50,8 @@ class Controller(QObject):
         self.results = Results()
         self.results.snapshot.connect(self._snapshot)
         self.results.finished.connect(self._finished)
+        self.results.engine.connect(self._engine_ready)
+        self.downloading = False
         self.busy = {}
         self.traffic = Traffic()
         self.current = None
@@ -56,6 +59,7 @@ class Controller(QObject):
         self.window.app_action.connect(self.act)
         self.window.add_app.connect(self.add_app)
         self.window.add_profile.connect(self.add_profile)
+        self.window.get_engine.connect(self.get_engine)
         if self.tray:
             self.tray.app_action.connect(self.act)
             self.tray.open_window.connect(self.toggle_window)
@@ -83,7 +87,10 @@ class Controller(QObject):
     def _snapshot(self, snapshot, error):
         self.refreshing = False
         if snapshot is None:
-            self.window.show_unavailable(tr("cli_missing") if error == "vpngo-missing" else error)
+            if error == "vpngo-missing":
+                self.window.show_engine_missing(self.downloading)
+            elif not self.downloading:
+                self.window.show_unavailable(error)
             return
         self.current = snapshot
         rates = self.traffic.update(snapshot.apps)
@@ -169,6 +176,30 @@ class Controller(QObject):
             return
         name, path = dialog.values()
         self.run(f"profile:{name}", tr("action_add_profile", profile=name), [["profile", "add", name, path]])
+
+    def get_engine(self):
+        """Download vpngo as the interface's private engine and start using it."""
+        if self.downloading:
+            return
+        self.downloading = True
+        self.window.show_engine_missing(downloading=True)
+
+        def work():
+            from . import engine
+            try:
+                engine.record(engine.download_engine(report=lambda message: None))
+                self.results.engine.emit(None)
+            except (engine.EngineError, OSError) as error:
+                self.results.engine.emit(str(error))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _engine_ready(self, error):
+        self.downloading = False
+        if error:
+            self.window.show_engine_missing()
+            self.window.message.show_message(tr("failed", action=tr("get_engine"), error=error), error=True)
+        self.refreshing = False
+        self.refresh()
 
     def _ask_password(self, action_text):
         self.show_window()

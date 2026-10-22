@@ -28,6 +28,11 @@ MESSAGES = {
         "no_profiles_title": "Add a VPN profile first",
         "no_profiles_body": "A profile is a WireGuard .conf file from your VPN provider.",
         "cli_missing": "vpngo was not found. Install vpngo, then run vpngo --install-gui again.",
+        "engine_title": "The interface needs vpngo",
+        "engine_body": "vpngo was not found on this computer. Download a private copy for the interface "
+                       "(it is not added to PATH), or install vpngo and reopen the interface.",
+        "get_engine": "Download vpngo",
+        "engine_downloading": "Downloading and checking vpngo…",
         "dismiss": "Dismiss",
         "cancel": "Cancel",
         "add": "Add",
@@ -98,6 +103,11 @@ MESSAGES = {
         "no_profiles_title": "Adicione um perfil de VPN primeiro",
         "no_profiles_body": "Um perfil é um arquivo .conf do WireGuard do seu provedor de VPN.",
         "cli_missing": "O vpngo não foi encontrado. Instale o vpngo e rode vpngo --install-gui de novo.",
+        "engine_title": "A interface precisa do vpngo",
+        "engine_body": "O vpngo não foi encontrado neste computador. Baixe uma cópia só para a interface "
+                       "(ela não entra no PATH), ou instale o vpngo e abra a interface de novo.",
+        "get_engine": "Baixar o vpngo",
+        "engine_downloading": "Baixando e conferindo o vpngo…",
         "dismiss": "Fechar",
         "cancel": "Cancelar",
         "add": "Adicionar",

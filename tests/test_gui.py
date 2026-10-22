@@ -8,6 +8,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -208,6 +209,26 @@ class WindowTest(FakeCli):
         controller.refresh()
         self.settle(lambda: not controller.refreshing)
         self.assertEqual(controller.window.tiles, tiles)
+
+    def test_without_vpngo_the_window_offers_its_own_engine(self):
+        from vpngo_gui import engine
+        os.environ.pop("VPNGO_GUI_CLI")
+        prefix = Path(self.directory.name) / "gui"
+        with (patch.dict(os.environ, {"VPNGO_GUI_PREFIX": str(prefix)}),
+              patch.object(cli.shutil, "which", return_value=None),
+              patch.object(engine, "download_engine", return_value=FAKE)):
+            from vpngo_gui.app import Controller
+            application = QApplication.instance() or QApplication([])
+            controller = Controller(application)
+            controller.timer.stop()
+            self.addCleanup(self.drain)
+            self.addCleanup(controller.shutdown)
+            self.settle(lambda: controller.window.engine_missing)
+            self.assertFalse(controller.window.empty.button.isHidden())
+            controller.window.empty.button.click()
+            self.settle(lambda: controller.current is not None)
+        self.assertEqual(json.loads((prefix / "cli.json").read_text())["command"], FAKE)
+        self.assertEqual(set(controller.window.tiles), {"vesktop", "steam", "spotify"})
 
     def test_server_address_is_masked_until_clicked(self):
         data = json.loads(self.state.read_text())

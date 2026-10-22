@@ -157,6 +157,13 @@ def main(out):
     settle(300)
     first.grab().save(str(out / "tray-app-menu.png"))
     shot("no-profiles", {"profiles": [], "apps": []})
+    lonely = gui.Window()
+    lonely.resize(760, 520)
+    lonely.show()
+    lonely.show_engine_missing()
+    settle(300)
+    lonely.grab().save(str(out / "engine-missing.png"))
+    lonely.close()
     print(f"Saved screenshots in {out}")
 
 

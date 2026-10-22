@@ -15,13 +15,24 @@ The interface runs the same `vpngo` commands you would type, so the command line
 
 ## Install
 
-Install vpngo 0.5.0 or newer first (0.6.0 or newer for running time, traffic and server address), then run:
+**Without vpngo installed.** Download `install.py` from the [latest release](https://github.com/GustavoHSCruz/VPNGo-gui/releases/latest) and run it with Python 3:
+
+```sh
+curl -fLO https://github.com/GustavoHSCruz/VPNGo-gui/releases/latest/download/install.py
+python3 install.py          # Windows: python install.py
+```
+
+It looks for `vpngo` on `PATH` first. If it finds vpngo 0.5.0 or newer, the interface uses it. If not (missing, or too old), it downloads the latest vpngo release, checks it against `SHA256SUMS` and keeps it as the interface's own engine in its folder, without adding a `vpngo` command. Either way that vpngo then installs the interface. vpngo's system requirements still apply: on Linux, vopono and the tools listed in the [vpngo guide](https://github.com/GustavoHSCruz/VPNGo/blob/main/docs/HOWTO.md).
+
+**With vpngo installed** (0.5.0 or newer; 0.6.0 or newer for running time, traffic and server address):
 
 ```sh
 vpngo --install-gui
 ```
 
-The command downloads the latest interface release, checks it against `SHA256SUMS`, and installs it with its own Python environment, so PySide6 (Qt) never touches your system Python. The first install downloads about 250 MB; a PySide6 already installed on the system (for example the distribution's package) is reused. Run it again to upgrade.
+Both download the latest interface release, check it against `SHA256SUMS`, and install it with its own Python environment, so PySide6 (Qt) never touches your system Python. The first install downloads about 250 MB; a PySide6 already installed on the system (for example the distribution's package) is reused. Run the same command again to upgrade.
+
+If the window opens and finds no vpngo at all, it offers to download its engine itself. `vpngo-gui --update-engine` updates a downloaded engine to the latest vpngo.
 
 | System | Installed in | Command | Menu entry |
 | --- | --- | --- | --- |
@@ -31,7 +42,7 @@ The command downloads the latest interface release, checks it against `SHA256SUM
 
 `vpngo-gui --hidden` starts in the tray without opening the window. Closing the window keeps the tray running; use **Quit** in the tray menu to exit. Opening it again while it runs shows the existing window.
 
-To remove it, delete the install folder, the command and, on Linux, `~/.local/share/applications/vpngo-gui.desktop`.
+To remove it, delete the install folder (it also holds the downloaded engine, if any), the command and, on Linux, `~/.local/share/applications/vpngo-gui.desktop`.
 
 ## Passwords
 

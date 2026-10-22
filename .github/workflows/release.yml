@@ -63,5 +63,5 @@ jobs:
           prerelease=
           case "$VERSION" in *-*) prerelease=--prerelease ;; esac
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "vpngo-gui $VERSION" \
-            --notes "Install or upgrade with \`vpngo --install-gui\` (needs vpngo 0.5.0 or newer)." \
+            --notes "Install or upgrade with \`python3 install.py\` (no vpngo needed; it uses or downloads vpngo) or \`vpngo --install-gui\` (vpngo 0.5.0 or newer)." \
             --generate-notes --verify-tag $prerelease
