@@ -206,7 +206,7 @@ def main(out):
     board.grab().save(str(out / "update-offer.png"))
     board.close()
     from vpngo_gui.dialogs import ConfirmDialog, GroupDialog
-    for name, dialog in (("dialog-group", GroupDialog("steam")),
+    for name, dialog in (("dialog-group", GroupDialog([(a["name"], a.get("group")) for a in grouped["apps"]], ["jogos"], "jogos")),
                          ("dialog-remove", ConfirmDialog(tr("remove_title", app="spotify"), tr("remove_body"),
                                                          tr("remove")))):
         dialog.show()

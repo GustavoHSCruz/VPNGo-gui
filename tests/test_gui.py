@@ -315,6 +315,35 @@ class WindowTest(FakeCli):
                                       ["group", "switch", "games", "br"]])
         self.settle(lambda: window.other_header.isHidden())
 
+    def test_groups_are_created_and_edited_from_one_dialog(self):
+        from vpngo_gui import dialogs
+        data = json.loads(self.state.read_text())
+        data["groups"] = {"games": ["steam", "spotify"]}
+        self.state.write_text(json.dumps(data))
+        controller = self.controller()
+        self.assertFalse(controller.window.groups_button.isHidden())
+        dialog = dialogs.GroupDialog([("vesktop", None), ("steam", "games")], ["games"], checked=("vesktop",))
+        self.assertEqual(dialog.values(), ("", ["vesktop"]))
+        dialog.submit()
+        self.assertIn("letter", dialog.error.text())
+        self.assertIn("in games", dialog.boxes[1].text())
+
+        def answer(name, apps):
+            def exec_(dialog):
+                dialog.name.setText(name)
+                for box in dialog.boxes:
+                    box.setChecked(box.property("app") in apps)
+                return dialogs.QDialog.DialogCode.Accepted
+            return exec_
+        with patch.object(dialogs.GroupDialog, "exec", answer("chat", ["vesktop"])):
+            controller.group_act("", "new", None)
+        self.settle(lambda: not controller.busy)
+        with patch.object(dialogs.GroupDialog, "exec", answer("play", ["steam", "vesktop"])):
+            controller.group_act("games", "edit", None)
+        self.settle(lambda: not controller.busy)
+        self.assertEqual(self.log(), [["group", "add", "chat", "vesktop"], ["group", "rename", "games", "play"],
+                                      ["group", "add", "play", "vesktop"], ["group", "remove", "play", "spotify"]])
+
     def test_protection_and_removal_reach_vpngo(self):
         from vpngo_gui import dialogs
         controller = self.controller()

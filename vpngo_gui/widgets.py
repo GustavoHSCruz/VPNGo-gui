@@ -22,6 +22,10 @@ ICONS = {
     "sliders": '<path d="M4 8h9M17 8h3M4 16h3M11 16h9" stroke="{c}" stroke-width="1.8" stroke-linecap="round" '
                'fill="none"/><circle cx="15" cy="8" r="2" stroke="{c}" stroke-width="1.8" fill="none"/>'
                '<circle cx="9" cy="16" r="2" stroke="{c}" stroke-width="1.8" fill="none"/>',
+    "grid": '<rect x="4.5" y="4.5" width="6" height="6" rx="1.5" stroke="{c}" stroke-width="1.8" fill="none"/>'
+            '<rect x="13.5" y="4.5" width="6" height="6" rx="1.5" stroke="{c}" stroke-width="1.8" fill="none"/>'
+            '<rect x="4.5" y="13.5" width="6" height="6" rx="1.5" stroke="{c}" stroke-width="1.8" fill="none"/>'
+            '<rect x="13.5" y="13.5" width="6" height="6" rx="1.5" stroke="{c}" stroke-width="1.8" fill="none"/>',
     "layers": '<path d="M12 4l8 4-8 4-8-4 8-4z M4 12l8 4 8-4 M4 16l8 4 8-4" stroke="{c}" stroke-width="1.8" '
               'stroke-linejoin="round" stroke-linecap="round" fill="none"/>',
 }

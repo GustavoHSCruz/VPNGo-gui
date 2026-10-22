@@ -211,12 +211,7 @@ class Controller(QObject):
             else:  # Both backends switch only a route that is on the VPN.
                 steps = [["on", name], ["switch", name, argument]]
         elif action == "group_new":
-            dialog = GroupDialog(name, (group for group, _ in self.current.groups), self.window)
-            if dialog.exec() != QDialog.DialogCode.Accepted:
-                return
-            group = dialog.value()
-            text, label, steps = tr("action_group_add", app=name, group=group), tr("busy_save"), [
-                ["group", "add", group, name]]
+            return self.edit_group(None, checked=(name,))
         elif action == "group_join":
             text, label, steps = tr("action_group_add", app=name, group=argument), tr("busy_save"), [
                 ["group", "add", argument, name]]
@@ -242,6 +237,8 @@ class Controller(QObject):
     def group_act(self, group, action, argument):
         if self.current is None:
             return
+        if action in {"new", "edit"}:
+            return self.edit_group(group or None)
         members = next((list(apps) for name, apps in self.current.groups if name == group), [])
         keys = ["group:" + group, *members]
         if any(key in self.busy for key in keys):
@@ -255,6 +252,32 @@ class Controller(QObject):
         # One vpngo command for the whole group: one password, and vpngo carries on past a failing app.
         self.run(keys, tr("action_group_" + action, group=group), [["group", action, group]],
                  tr("busy_" + action), timeout=120 * max(1, len(members)))
+
+    def edit_group(self, group, checked=()):
+        """Create a group (group None) or change one's name and apps, in a single vpngo action."""
+        if self.current is None or (group and "group:" + group in self.busy):
+            return
+        apps = [(app.name, app.group) for app in self.current.apps]
+        dialog = GroupDialog(apps, (name for name, _ in self.current.groups), group, checked, self.window)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        name, chosen = dialog.values()
+        before = next((list(members) for g, members in self.current.groups if g == group), [])
+        steps = []
+        if group and name != group:
+            steps.append(["group", "rename", group, name])
+        added = [app for app in chosen if app not in before]
+        removed = [app for app in before if app not in chosen]
+        # Add before removing: a group emptied on the way would be deleted.
+        if added:
+            steps.append(["group", "add", name, *added])
+        if removed:
+            steps.append(["group", "remove", name, *removed])
+        if not steps:
+            return
+        keys = ["group:" + (group or name), *dict.fromkeys(before + added)]
+        text = tr("action_group_edit" if group else "action_group_new", group=name)
+        self.run(keys, text, steps, tr("busy_save"))
 
     def profile_act(self, profile, action):
         if action == "remove":

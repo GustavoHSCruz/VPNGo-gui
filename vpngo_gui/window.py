@@ -490,6 +490,7 @@ class GroupHeader(QWidget):
             add_profiles(self.menu, self.profiles, shared.pop() if len(shared) == 1 else None,
                          lambda p: emit(self.name, "switch", p))
         self.menu.addSeparator()
+        self.menu.addAction(tr("group_edit"), lambda: emit(self.name, "edit", None))
         self.menu.addAction(tr("group_delete"), lambda: emit(self.name, "delete", None))
 
 
@@ -803,6 +804,13 @@ class Window(QWidget):
         bar.addStretch()
         self.summary = Summary()
         bar.addWidget(self.summary)
+        self.groups_button = PillButton("grid", tr("groups"))
+        self.groups_menu = QMenu(self.groups_button)
+        self.groups_button.clicked.connect(lambda: self.groups_menu.popup(
+            self.groups_button.mapToGlobal(self.groups_button.rect().bottomLeft())))
+        self.groups_menu.aboutToShow.connect(self._fill_groups_menu)
+        self.groups_button.hide()  # Until vpngo can keep groups (0.7.0 and later).
+        bar.addWidget(self.groups_button)
         self.profiles_button = PillButton("layers", tr("profiles"))
         self.profiles_menu = QMenu(self.profiles_button)
         self.profiles_button.clicked.connect(lambda: self.profiles_menu.popup(
@@ -867,6 +875,20 @@ class Window(QWidget):
             self.profiles_menu.addSeparator()
         self.profiles_menu.addAction(tr("add_profile"), self.add_profile.emit)
 
+    def _fill_groups_menu(self):
+        """New group first, then each group with its edit and delete."""
+        menu, emit = self.groups_menu, self.group_action.emit
+        menu.clear()
+        menu.addAction(tr("group_new"), lambda: emit("", "new", None))
+        groups = self.snapshot.groups if self.snapshot else ()
+        if groups:
+            menu.addSeparator()
+        for group, _ in groups:
+            item = menu.addMenu(group)
+            item.menuAction().setFont(theme.font(13, mono=True))
+            item.addAction(tr("group_edit"), lambda _=False, g=group: emit(g, "edit", None))
+            item.addAction(tr("group_delete"), lambda _=False, g=group: emit(g, "delete", None))
+
     def set_settings(self, settings):
         """language (None follows the system), autostart, notify, version, update (a newer version or None)."""
         self.settings = dict(settings)
@@ -897,6 +919,7 @@ class Window(QWidget):
         self.engine_missing = False
         self.summary.hide()
         self.profiles_button.hide()
+        self.groups_button.hide()
         self.scroll.hide()
         self.empty.show_message("VPNGo", text)
         self.empty.show()
@@ -906,6 +929,7 @@ class Window(QWidget):
         self.engine_missing = True
         self.summary.hide()
         self.profiles_button.hide()
+        self.groups_button.hide()
         self.scroll.hide()
         self.empty.show_message(tr("engine_title"), tr("engine_downloading") if downloading else tr("engine_body"),
                                 tr("get_engine"))
@@ -924,6 +948,7 @@ class Window(QWidget):
         self.engine_missing = False
         self.empty.button.setEnabled(True)
         self.profiles_button.show()
+        self.groups_button.setVisible(snapshot.manages and bool(snapshot.apps))
         first = self.snapshot is None
         self.snapshot = snapshot
         animate = animate and not first

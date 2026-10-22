@@ -7,7 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
-                               QPushButton, QVBoxLayout)
+                               QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from . import theme
 from .i18n import tr
@@ -174,19 +174,49 @@ class AddProfileDialog(Dialog):
 
 
 class GroupDialog(Dialog):
-    def __init__(self, app, existing=(), parent=None):
-        super().__init__(tr("group_title"), parent)
-        self.existing = set(existing)
-        body = QLabel(tr("group_body", app=app))
-        body.setWordWrap(True)
-        body.setProperty("role", "muted")
-        self.layout_.addWidget(body)
-        self.name = QLineEdit()
+    """Create a group, or edit one: its name and which apps are in it.
+
+    apps: (name, its group or None) for every app. An app in another group can be picked;
+    vpngo then moves it here, and its line says which group it comes from.
+    """
+
+    def __init__(self, apps, existing=(), group=None, checked=(), parent=None):
+        super().__init__(tr("group_edit_title", group=group) if group else tr("group_title"), parent)
+        self.group = group
+        self.existing = set(existing) - {group}
+        self.name = QLineEdit(group or "")
         self.name.setProperty("mono", True)
         self.name.setPlaceholderText("jogos")
         self.name.setMaxLength(32)
         self.field(tr("group_name"), self.name)
-        self.buttons(tr("group_create"))
+        caption = QLabel(tr("group_apps"))
+        caption.setProperty("role", "field")
+        self.layout_.addSpacing(14)
+        self.layout_.addWidget(caption)
+        self.layout_.addSpacing(8)
+        holder = QWidget()
+        rows = QVBoxLayout(holder)
+        rows.setContentsMargins(0, 0, 0, 0)
+        rows.setSpacing(10)
+        self.boxes = []
+        for app, current in apps:
+            label = app if not current or current == group else f"{app}  ·  {tr('group_in', group=current)}"
+            box = QCheckBox(label)
+            box.setChecked(app in checked or (group is not None and current == group))
+            box.setProperty("app", app)
+            rows.addWidget(box)
+            self.boxes.append(box)
+        rows.addStretch()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setWidget(holder)
+        holder.setAutoFillBackground(False)
+        scroll.viewport().setAutoFillBackground(False)
+        # As tall as the list, up to about eight apps; past that it scrolls.
+        scroll.setFixedHeight(min(240, holder.sizeHint().height()))
+        self.layout_.addWidget(scroll)
+        self.buttons(tr("save") if group else tr("group_create"))
         self.name.setFocus()
 
     def submit(self):
@@ -195,10 +225,13 @@ class GroupDialog(Dialog):
             return self.fail(tr("bad_group_name"))
         if name in self.existing:
             return self.fail(tr("group_exists"))
+        if not self.values()[1]:
+            return self.fail(tr("group_need_app"))
         self.accept()
 
-    def value(self):
-        return self.name.text().strip().casefold()
+    def values(self):
+        """(name, [checked apps]) in the order shown."""
+        return self.name.text().strip().casefold(), [box.property("app") for box in self.boxes if box.isChecked()]
 
 
 class ConfirmDialog(Dialog):

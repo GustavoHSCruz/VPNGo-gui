@@ -50,6 +50,8 @@ def main(args):
                 if app in members:
                     members.remove(app)
         groups.setdefault(args[2], []).extend(args[3:])
+    elif command == "group" and args[1] == "rename":
+        data["groups"] = {args[3] if name == args[2] else name: members for name, members in groups.items()}
     elif command == "group" and args[1] == "remove":
         if args[3:]:
             groups[args[2]] = [app for app in groups[args[2]] if app not in args[3:]]
