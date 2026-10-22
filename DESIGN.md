@@ -217,7 +217,7 @@ A warm charcoal palette where green is a signal, not a brand flourish.
 - **Data** (JetBrains Mono 400, 13px; 12px inside the tile detail line): profile names, file paths in inputs, the profile combo.
 
 ### Named Rules
-**The Data Is Mono Rule.** Profile names, file paths and endpoints set in JetBrains Mono; route words, actions and labels set in Inter, even on the same line ("us · VPN").
+**The Data Is Mono Rule.** Profile names, file paths and endpoints set in JetBrains Mono; route words, actions and labels set in Inter, even on the same line ("us · VPN"). One accepted exception, the owner's call: profile names inside QMenus (tile and tray menus) stay in Inter so they remain plain checkable items, one click deep and arrow-key navigable.
 
 ## Layout
 
