@@ -302,6 +302,9 @@ A 7px light with a 13px halo at 22% alpha in the state color. Stopped is a hollo
 ### Route Clocks
 Two clocks side by side in the top row, after the state dot: the app's total time on the VPN, then its total time on the direct route (since it opened), Data Small, 14px apart. Told apart by color, not by words: the VPN figure in route green, the direct figure in grey; the route the app is on now is the bright one (green, or text color), the other is dimmed. A clock that has not run reads "0 min". When both full figures do not fit, both switch to the short form ("15h46", "27m", "2d3h") rather than being cut. The tooltip lists the time on the current route since the last switch, both totals, the data moved on this route and how long the app has been open. With vpngo before 0.7.0 only one clock shows: the time since the app started. Running apps only.
 
+### Opened Outside
+A stopped app whose program is running anyway (opened without VPNGo, so without the VPN) keeps the sunk card and hollow dot but not the dimmed title: its detail word is "sem VPN" in amber, and its button reads "Reabrir". The button and the menu's "Reabrir pela VPN" ask first, since vpngo closes the open copy before opening it on the VPN. Every running or open app's menu starts with a disabled line saying who opened it ("Aberto pelo VPNGo" or "Aberto por fora do VPNGo, sem VPN"), and the tray warns once when an app is opened without the VPN.
+
 ### Rates
 Download over upload, stacked in two 14px lines right of the app name on cards 260px and wider, bottom-aligned with the title. Data Small in muted, right-aligned, each followed by a drawn 10px arrow icon (↓ then ↑, never a glyph). The slot is fixed at the width of "000 kB/s" plus the arrow, so the title's cut point never moves between refreshes; empty until a first rate is known.
 

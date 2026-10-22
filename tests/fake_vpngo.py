@@ -31,7 +31,7 @@ def main(args):
     if command in {"on", "off"}:
         apps[name]["state"] = "vpn" if command == "on" else "direct"
     elif command == "start":
-        apps[name].update(state="vpn", active_profile=apps[name]["profile"])
+        apps[name].update(state="vpn", active_profile=apps[name]["profile"], origin="vpngo")
     elif command == "stop":
         apps[name].update(state="stopped", active_profile=None)
     elif command in {"--temp", "--install-gui"}:

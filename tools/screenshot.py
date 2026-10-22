@@ -169,6 +169,9 @@ def main(out):
     settle(300)
     first.grab().save(str(out / "tray-app-menu.png"))
     shot("no-profiles", {"profiles": [], "apps": []})
+    outside = json.loads(json.dumps(DEMO))
+    outside["apps"][3]["origin"] = "outside"
+    shot("outside", outside)
 
     # One app on the direct route, the case that prompted the route clock, in a tiled window.
     single = {**DEMO["apps"][0], "state": "direct", "route_since": NOW - 10 * 60,

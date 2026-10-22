@@ -344,6 +344,27 @@ class WindowTest(FakeCli):
         self.assertEqual(self.log(), [["group", "add", "chat", "vesktop"], ["group", "rename", "games", "play"],
                                       ["group", "add", "play", "vesktop"], ["group", "remove", "play", "spotify"]])
 
+    def test_an_app_opened_outside_offers_to_reopen_it_on_the_vpn(self):
+        from vpngo_gui import dialogs
+        data = json.loads(self.state.read_text())
+        data["apps"][2]["origin"] = "outside"
+        data["apps"][0]["origin"] = "vpngo"
+        self.state.write_text(json.dumps(data))
+        controller = self.controller()
+        tile = controller.window.tiles["spotify"]
+        self.assertEqual(tile.start.text(), "Reopen")
+        self.assertIn("no VPN", tile.detail.text())
+        tile._fill_menu()
+        self.assertEqual(tile.menu.actions()[0].text(), "Opened outside VPNGo, without the VPN")
+        with patch.object(dialogs.ConfirmDialog, "exec", return_value=dialogs.QDialog.DialogCode.Rejected):
+            tile.start.click()
+        self.assertEqual(self.log(), [])
+        with patch.object(dialogs.ConfirmDialog, "exec", return_value=dialogs.QDialog.DialogCode.Accepted):
+            tile.start.click()
+        self.settle(lambda: not controller.busy)
+        self.assertEqual(self.log(), [["start", "spotify"]])
+        self.settle(lambda: tile.start.isHidden())
+
     def test_protection_and_removal_reach_vpngo(self):
         from vpngo_gui import dialogs
         controller = self.controller()

@@ -48,7 +48,7 @@ def route_tip(app):
     if not app.running or not since:
         return ""
     current = uptime_text(since)
-    lines = [tr({"vpn": "on_vpn_for", "direct": "direct_for"}.get(app.state, "partial_for"), time=current)]
+    lines = [tr("origin_vpngo")] + [tr({"vpn": "on_vpn_for", "direct": "direct_for"}.get(app.state, "partial_for"), time=current)]
     if app.vpn_seconds is not None:
         lines += [tr("total_vpn", time=duration_text(app.vpn_seconds)),
                   tr("total_direct", time=duration_text(app.direct_seconds))]
@@ -273,7 +273,7 @@ class AppTile(Tile):
         self.start.setFixedHeight(28)
         self.start.setStyleSheet("QPushButton { height: 28px; padding: 0 14px; border-radius: 14px; }")
         self.start.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.start.clicked.connect(lambda: self.action.emit(self.name, "start", None))
+        self.start.clicked.connect(lambda: self.action.emit(self.name, "reopen" if self.app.outside else "start", None))
         bottom.addWidget(self.start)
         outer.addWidget(row)
         self.update_app(app, (), animate=False)
@@ -290,10 +290,13 @@ class AppTile(Tile):
         self.warn = 1.0 if app.state == "partial" else 0.0
         self.switch.setVisible(running)
         self.start.setVisible(not running)
+        # Opened outside VPNGo: the same button closes that copy and opens it again on the VPN.
+        self.start.setText(tr("reopen") if app.outside else tr("start"))
+        self.start.setToolTip(tr("reopen_tip", app=app.name) if app.outside else "")
         if running:
             self.switch.set_checked_quietly(app.state in {"vpn", "partial"})
         dim = theme.mix(theme.TEXT, theme.BG, .4).name()
-        self.title.setStyleSheet(f"color: {theme.TEXT if running else dim}; letter-spacing: -0.2px;")
+        self.title.setStyleSheet(f"color: {theme.TEXT if running or app.outside else dim}; letter-spacing: -0.2px;")
         if first or app.executable != getattr(self, "_executable", None):
             self._executable = app.executable
             found = app_icon(app.name, app.executable)
@@ -356,9 +359,9 @@ class AppTile(Tile):
     def _show_detail(self):
         app = self.app
         # The profile is data (mono); the route word is language (sans).
-        word = self.busy or tr("state_" + app.state)
-        color = theme.WARN if app.state == "partial" and not self.busy else theme.MUTED
-        if not app.running and not self.busy:
+        word = self.busy or tr("state_outside" if app.outside else "state_" + app.state)
+        color = theme.WARN if (app.state == "partial" or app.outside) and not self.busy else theme.MUTED
+        if not app.running and not app.outside and not self.busy:
             color = theme.mix(theme.MUTED, theme.BG, .3).name()
         self.detail.setText(f'<span style="font-family:\'{theme.MONO}\'; font-size:12px">{escape(app.shown_profile)}'
                             f'</span>&nbsp;&nbsp;·&nbsp;&nbsp;{escape(word)}')
@@ -368,7 +371,14 @@ class AppTile(Tile):
         self.menu.clear()
         app = self.app
         emit = self.action.emit
-        if app.running:
+        if app.running or app.outside:
+            # Who opened it, so a copy running without the VPN is never mistaken for a protected one.
+            origin = self.menu.addAction(tr("origin_vpngo") if app.running else tr("origin_outside"))
+            origin.setEnabled(False)
+            self.menu.addSeparator()
+        if app.outside:
+            self.menu.addAction(tr("reopen_vpn"), lambda: emit(self.name, "reopen", None))
+        elif app.running:
             self.menu.addAction(tr("restart"), lambda: emit(self.name, "start", None))
             self.menu.addAction(tr("stop"), lambda: emit(self.name, "stop", None))
         else:

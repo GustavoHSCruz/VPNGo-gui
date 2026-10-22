@@ -179,8 +179,13 @@ class Controller(QObject):
         if not self.tray or not self._notify():
             return
         before = {app.name: app.state for app in previous.apps}
+        outside_before = {app.name for app in previous.apps if app.outside}
         now = time.monotonic()
         for app in snapshot.apps:
+            if app.outside and app.name not in outside_before and app.name not in self.busy:
+                self.tray.showMessage("VPNGo", tr("opened_outside", app=app.name),
+                                      QSystemTrayIcon.MessageIcon.Warning, 8000)
+                continue
             if before.get(app.name) != "vpn" or app.state == "vpn" or app.name in self.busy:
                 continue
             if now - self.acted.get(app.name, -QUIET_AFTER_ACTION) < QUIET_AFTER_ACTION:
@@ -222,6 +227,13 @@ class Controller(QObject):
             policy, on = argument
             text, label, steps = tr("action_policy", app=name), tr("busy_save"), [
                 ["policy", name, policy, "on" if on else "off"]]
+        elif action == "reopen":
+            dialog = ConfirmDialog(tr("reopen_title", app=name), tr("reopen_body", app=name), tr("reopen"),
+                                   self.window)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            # vpngo start closes the copy opened outside it, then opens the app on its VPN profile.
+            text, label, steps = tr("action_reopen", app=name), tr("busy_start"), [["start", name]]
         elif action == "remove":
             dialog = ConfirmDialog(tr("remove_title", app=name), tr("remove_body"), tr("remove"), self.window)
             if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -346,7 +358,8 @@ class Controller(QObject):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         name, path = dialog.values()
-        self.run(f"profile:{name}", tr("action_add_profile", profile=name), [["profile", "add", name, path]])
+        self.run(f"profile:{name}", tr("action_add_profile", profile=name), [["profile", "add", name, path]],
+                 success=tr("profile_encrypted", profile=name))
 
     def lookup_ip(self):
         """Look the public IP up once for every direct tile, and reuse it for a few minutes."""

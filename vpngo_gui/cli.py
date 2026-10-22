@@ -36,12 +36,17 @@ class App:
     route_tx_bytes: int | None = None
     executable: str | None = None
     group: str | None = None
+    origin: str | None = None             # "vpngo", or "outside" when it runs without vpngo (no VPN).
     killswitch: bool = False
     dns: bool = False
 
     @property
     def running(self):
         return self.state != "stopped"
+
+    @property
+    def outside(self):
+        return not self.running and self.origin == "outside"
 
     @property
     def shown_profile(self):
@@ -88,6 +93,7 @@ def parse_snapshot(text):
                         route_rx_bytes=number(item.get("route_rx_bytes"), int),
                         route_tx_bytes=number(item.get("route_tx_bytes"), int),
                         executable=item.get("executable") or None, group=item.get("group") or None,
+                        origin=item.get("origin") or None,
                         killswitch=bool(item.get("killswitch")), dns=bool(item.get("dns"))))
     groups = tuple((str(group["name"]), tuple(str(name) for name in group.get("apps", [])))
                    for group in data.get("groups", []) if isinstance(group, dict) and group.get("name"))

@@ -100,7 +100,8 @@ class Tray(QSystemTrayIcon):
         return menu
 
     def _app_menu(self, app, profiles):
-        state = f"{app.shown_profile} · {self.busy.get(app.name) or tr('state_' + app.state)}"
+        word = tr("state_outside") if app.outside else tr("state_" + app.state)
+        state = f"{app.shown_profile} · {self.busy.get(app.name) or word}"
         since = app.route_since or app.started_at
         if app.running and since and app.name not in self.busy:
             state += f" · {uptime_text(since)}"
@@ -114,6 +115,8 @@ class Tray(QSystemTrayIcon):
                 menu.addAction(tr("vpn_on"), lambda: emit(app.name, "on", None))
             menu.addAction(tr("restart"), lambda: emit(app.name, "start", None))
             menu.addAction(tr("stop"), lambda: emit(app.name, "stop", None))
+        elif app.outside:
+            menu.addAction(tr("reopen_vpn"), lambda: emit(app.name, "reopen", None))
         else:
             menu.addAction(tr("start"), lambda: emit(app.name, "start", None))
         if len(profiles) > 1:
