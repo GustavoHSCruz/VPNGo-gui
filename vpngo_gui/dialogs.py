@@ -48,6 +48,29 @@ class Dialog(QDialog):
         self.error.setStyleSheet(f"color: {theme.DANGER}; font-size: 13px;")
         self.error.hide()
 
+    def paragraph(self, text):
+        """Muted body text that wraps; its height is reserved before the dialog opens (see _fit_text)."""
+        body = QLabel(text)
+        body.setWordWrap(True)
+        body.setProperty("role", "muted")
+        self.layout_.addWidget(body)
+        return body
+
+    def _fit_text(self):
+        """A wrapped label reports a one-line height, so a window manager that sizes the dialog
+        from its hint (Hyprland, for one) cuts the text. Reserve each one's real height."""
+        self.layout_.activate()
+        margins = self.layout_.contentsMargins()
+        width = max(self.width(), self.minimumWidth()) - margins.left() - margins.right()
+        for label in self.findChildren(QLabel):
+            if label.wordWrap() and label.isVisibleTo(self):
+                label.setMinimumHeight(label.heightForWidth(width))
+        self.adjustSize()
+
+    def showEvent(self, event):
+        self._fit_text()
+        super().showEvent(event)
+
     def field(self, label, widget):
         caption = QLabel(label)
         caption.setProperty("role", "field")
@@ -98,6 +121,7 @@ class Dialog(QDialog):
     def fail(self, text):
         self.error.setText(text)
         self.error.show()
+        self._fit_text()
 
     def submit(self):
         self.accept()
@@ -237,10 +261,7 @@ class GroupDialog(Dialog):
 class ConfirmDialog(Dialog):
     def __init__(self, title, text, confirm, parent=None):
         super().__init__(title, parent)
-        body = QLabel(text)
-        body.setWordWrap(True)
-        body.setProperty("role", "muted")
-        self.layout_.addWidget(body)
+        self.paragraph(text)
         self.buttons(confirm)
 
 
@@ -254,10 +275,7 @@ class PasswordDialog(Dialog):
     def __init__(self, action_text, check, parent=None):
         super().__init__(tr("password_title"), parent)
         self.check = check
-        body = QLabel(tr("password_body", action=action_text))
-        body.setWordWrap(True)
-        body.setProperty("role", "muted")
-        self.layout_.addWidget(body)
+        self.paragraph(tr("password_body", action=action_text))
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.field(tr("password_label"), self.password)
