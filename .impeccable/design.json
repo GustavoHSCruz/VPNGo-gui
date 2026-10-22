@@ -1,0 +1,448 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21T23:45:00-03:00",
+  "title": "Design System: VPNGo",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Ground",
+        "canonical": "#111113",
+        "oklch": "oklch(17.9% 0.004 286.0)",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#252527",
+          "#424244",
+          "#616163",
+          "#828285",
+          "#a5a5a7",
+          "#c9c9cc",
+          "#eeeef1"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#19191c",
+        "oklch": "oklch(21.5% 0.006 285.9)",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252528",
+          "#424245",
+          "#616164",
+          "#828286",
+          "#a4a4a9",
+          "#c9c9cd",
+          "#eeeef2"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#26262a",
+        "oklch": "oklch(27.0% 0.007 285.9)",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252529",
+          "#414146",
+          "#616165",
+          "#828287",
+          "#a4a4a9",
+          "#c8c8ce",
+          "#eeeef3"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Bone Text",
+        "canonical": "#e9e7e2",
+        "oklch": "oklch(92.8% 0.007 88.6)",
+        "tonalRamp": [
+          "#0c0b08",
+          "#262521",
+          "#43423e",
+          "#63615d",
+          "#84827e",
+          "#a7a5a0",
+          "#cbc9c4",
+          "#f0eee9"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Warm Muted",
+        "canonical": "#8b8984",
+        "oklch": "oklch(63.0% 0.008 88.7)",
+        "tonalRamp": [
+          "#0c0b08",
+          "#272521",
+          "#44423d",
+          "#63615c",
+          "#84827d",
+          "#a7a5a0",
+          "#cbc9c4",
+          "#f0eee9"
+        ]
+      },
+      "route-green": {
+        "role": "primary",
+        "displayName": "Route Green",
+        "canonical": "#4cc38a",
+        "oklch": "oklch(73.5% 0.136 159.3)",
+        "tonalRamp": [
+          "#000f06",
+          "#012d1a",
+          "#084f32",
+          "#14734b",
+          "#0e9a64",
+          "#47bf86",
+          "#70e4a9",
+          "#c3ffdc"
+        ]
+      },
+      "route-green-border": {
+        "role": "primary",
+        "displayName": "Route Green Border (45% over hairline)",
+        "canonical": "#376d55",
+        "oklch": "oklch(49.0% 0.070 163.1)",
+        "tonalRamp": [
+          "#000f07",
+          "#022d1d",
+          "#154d37",
+          "#386e56",
+          "#599076",
+          "#7cb399",
+          "#9fd8bc",
+          "#c4fee1"
+        ]
+      },
+      "route-green-focus": {
+        "role": "primary",
+        "displayName": "Route Green Focus (75% over hairline)",
+        "canonical": "#429c72",
+        "oklch": "oklch(62.6% 0.108 160.6)",
+        "tonalRamp": [
+          "#000f07",
+          "#042d1c",
+          "#024f33",
+          "#09734c",
+          "#3b966c",
+          "#61ba8e",
+          "#86dfb2",
+          "#c5fedf"
+        ]
+      },
+      "partial-amber": {
+        "role": "secondary",
+        "displayName": "Partial Amber",
+        "canonical": "#e0a458",
+        "oklch": "oklch(76.1% 0.117 70.9)",
+        "tonalRamp": [
+          "#140800",
+          "#362001",
+          "#5b3a07",
+          "#845611",
+          "#ae7523",
+          "#d3984b",
+          "#f9bc70",
+          "#ffebd5"
+        ]
+      },
+      "danger-coral": {
+        "role": "tertiary",
+        "displayName": "Danger Coral",
+        "canonical": "#e5736b",
+        "oklch": "oklch(68.6% 0.143 25.6)",
+        "tonalRamp": [
+          "#1f0001",
+          "#4b0307",
+          "#7d0e14",
+          "#a33734",
+          "#ca5b54",
+          "#f17e76",
+          "#fdb4ac",
+          "#ffe9e6"
+        ]
+      },
+      "stopped-surface": {
+        "role": "neutral",
+        "displayName": "Sunk Surface",
+        "canonical": "#141417",
+        "oklch": "oklch(19.3% 0.006 285.8)",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252528",
+          "#424245",
+          "#616165",
+          "#828286",
+          "#a4a4a9",
+          "#c8c9cd",
+          "#eeeef2"
+        ]
+      },
+      "stopped-text": {
+        "role": "neutral",
+        "displayName": "Stopped Text",
+        "canonical": "#93918f",
+        "oklch": "oklch(65.8% 0.004 67.8)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#262523",
+          "#434240",
+          "#63615f",
+          "#848280",
+          "#a7a5a2",
+          "#cbc9c6",
+          "#f0eeec"
+        ]
+      },
+      "disabled-ink": {
+        "role": "neutral",
+        "displayName": "Disabled Ink",
+        "canonical": "#545351",
+        "oklch": "oklch(44.3% 0.003 84.6)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#262523",
+          "#434240",
+          "#62615f",
+          "#838280",
+          "#a6a5a3",
+          "#cac9c7",
+          "#efeeec"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Hover White",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Tile Title",
+        "purpose": "App name on each tile; empty-state heading."
+      },
+      "headline": {
+        "displayName": "Dialog Headline",
+        "purpose": "Dialog headings."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "\"VPNGo\" in the top bar."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Application default: add tile, checkbox, empty-state body."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, menu items, summary pill (+0.2px), tile detail line."
+      },
+      "caption": {
+        "displayName": "Field Caption",
+        "purpose": "Muted captions above dialog fields."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Profile names, file paths, the profile combo."
+      },
+      "data-small": {
+        "displayName": "Data Small",
+        "purpose": "Profile name inside the tile detail line."
+      }
+    },
+    "shadows": [
+      {
+        "name": "tile-fall",
+        "value": "0 12px 32px -16px rgb(0 0 0 / .6)",
+        "purpose": "Painted as 16 translucent layers reaching ~18px below running tiles; scales with the alive level; absent on stopped tiles."
+      },
+      {
+        "name": "tile-highlight",
+        "value": "inset 0 1px 0 rgb(255 255 255 / .035)",
+        "purpose": "Top-edge highlight line on running tiles, inset 14px from the corners."
+      },
+      {
+        "name": "state-halo",
+        "value": "0 0 0 3px <state color> / .22",
+        "purpose": "Halo around the 7px state dot; breathes to .47 alpha while busy."
+      },
+      {
+        "name": "window-glow",
+        "value": "radial-gradient(at 50% -10%, <muted→route-green> at 5–12% alpha, transparent 70%) over 80% of the window width",
+        "purpose": "Overall-state atmosphere at the top of the window."
+      }
+    ],
+    "motion": [
+      {
+        "name": "route-crossfade",
+        "value": "600ms cubic-bezier(.33, 1, .68, 1)",
+        "purpose": "OutCubic: tile border/tint, alive level, state dot color, window glow."
+      },
+      {
+        "name": "switch-slide",
+        "value": "200ms cubic-bezier(.33, 1, .68, 1)",
+        "purpose": "Route switch knob and track fill."
+      },
+      {
+        "name": "busy-breath",
+        "value": "1100ms ease-in-out-sine, infinite, triangle wave",
+        "purpose": "State dot halo while an action runs."
+      },
+      {
+        "name": "message-timeout",
+        "value": "6000ms",
+        "purpose": "Success message auto-dismiss; errors persist."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "column",
+        "value": "224px",
+        "purpose": "Each column needs a 210px tile plus 14px gap; 1 to 4 columns."
+      },
+      {
+        "name": "window-min",
+        "value": "300x360"
+      },
+      {
+        "name": "window-default",
+        "value": "760x520"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Bone pill for the single confirm action of a dialog or empty state.",
+      "html": "<button class=\"ds-btn-primary\">Adicionar</button>",
+      "css": ".ds-btn-primary { font-family: Inter, system-ui, sans-serif; height: 34px; padding: 0 16px; border: 1px solid #e9e7e2; border-radius: 17px; background: #e9e7e2; color: #111113; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s, border-color .2s; } .ds-btn-primary:hover { background: #ffffff; border-color: #ffffff; } .ds-btn-primary:focus-visible { outline: 2px solid #429c72; outline-offset: 2px; } .ds-btn-primary:disabled { background: #26262a; border-color: #26262a; color: #8b8984; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Default hairline pill: Cancel, Choose, the tile's Start.",
+      "html": "<button class=\"ds-btn-ghost\">Cancelar</button>",
+      "css": ".ds-btn-ghost { font-family: Inter, system-ui, sans-serif; height: 34px; padding: 0 16px; border: 1px solid #26262a; border-radius: 17px; background: transparent; color: #8b8984; font-size: 13px; cursor: pointer; transition: color .2s, border-color .2s; } .ds-btn-ghost:hover { color: #e9e7e2; border-color: #39745a; } .ds-btn-ghost:active { background: #26262a; } .ds-btn-ghost:focus-visible { outline: none; border-color: #429c72; }"
+    },
+    {
+      "name": "Summary Pill",
+      "kind": "chip",
+      "refersTo": "summary-pill",
+      "description": "Top-bar pill: overall state dot plus how many apps are on the VPN.",
+      "html": "<span class=\"ds-summary\"><i class=\"ds-dot\"></i>2 de 4 na VPN</span>",
+      "css": ".ds-summary { font-family: Inter, system-ui, sans-serif; display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px 0 12px; border: 1px solid #26262a; border-radius: 17px; color: #8b8984; font-size: 13px; letter-spacing: .2px; box-sizing: border-box; } .ds-summary .ds-dot { width: 7px; height: 7px; border-radius: 50%; background: #4cc38a; box-shadow: 0 0 0 3px rgb(76 195 138 / .22); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Ground well with hairline border; mono for paths and profile names.",
+      "html": "<input class=\"ds-input\" placeholder=\"/usr/bin/firefox\">",
+      "css": ".ds-input { font-family: 'JetBrains Mono', ui-monospace, monospace; height: 36px; padding: 0 12px; border: 1px solid #26262a; border-radius: 10px; background: #111113; color: #e9e7e2; font-size: 13px; outline: none; transition: border-color .2s; } .ds-input::placeholder { color: #8b8984; } .ds-input:focus-visible, .ds-input:focus { border-color: #376d55; }"
+    },
+    {
+      "name": "App Tile (on the VPN)",
+      "kind": "card",
+      "refersTo": "app-tile",
+      "description": "The signature tile, lit green by its route, with inset highlight and long soft shadow.",
+      "html": "<div class=\"ds-tile ds-tile-on\"><div class=\"ds-tile-top\"><i class=\"ds-dot\"></i><span class=\"ds-more\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\"><circle cx=\"5\" cy=\"12\" r=\"1.6\" fill=\"#8b8984\"/><circle cx=\"12\" cy=\"12\" r=\"1.6\" fill=\"#8b8984\"/><circle cx=\"19\" cy=\"12\" r=\"1.6\" fill=\"#8b8984\"/></svg></span></div><div class=\"ds-tile-name\">firefox</div><div class=\"ds-tile-row\"><span class=\"ds-tile-detail\"><code>br</code> &nbsp;·&nbsp; VPN</span><span class=\"ds-switch ds-switch-on\"><i></i></span></div></div>",
+      "css": ".ds-tile { font-family: Inter, system-ui, sans-serif; box-sizing: border-box; width: 230px; height: 168px; padding: 14px 14px 16px 18px; display: flex; flex-direction: column; border: 1px solid #26262a; border-radius: 14px; background: linear-gradient(#19191c, #19191c); box-shadow: inset 0 1px 0 rgb(255 255 255 / .035), 0 12px 32px -16px rgb(0 0 0 / .6); color: #e9e7e2; transition: border-color .6s cubic-bezier(.33,1,.68,1), background .6s; } .ds-tile-on { border-color: #376d55; background: linear-gradient(#1d2725, #19191c); } .ds-tile:hover { border-color: #3c8362; } .ds-tile-top { display: flex; justify-content: space-between; align-items: center; flex: 1; align-items: flex-start; } .ds-tile .ds-dot { margin: 4px; width: 7px; height: 7px; border-radius: 50%; background: #4cc38a; box-shadow: 0 0 0 3px rgb(76 195 138 / .22); } .ds-more { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; margin-top: -8px; } .ds-more:hover { background: #26262a; } .ds-tile-name { font-size: 20px; font-weight: 600; letter-spacing: -0.2px; margin-bottom: 6px; } .ds-tile-row { display: flex; align-items: center; justify-content: space-between; height: 28px; } .ds-tile-detail { color: #8b8984; font-size: 13px; } .ds-tile-detail code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; } .ds-switch { position: relative; width: 34px; height: 20px; border-radius: 10px; background: #26262a; transition: background .2s; } .ds-switch i { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #8b8984; transition: left .2s cubic-bezier(.33,1,.68,1), background .2s; } .ds-switch-on { background: #376d55; } .ds-switch-on i { left: 17px; background: #e9e7e2; }"
+    },
+    {
+      "name": "Route Switch",
+      "kind": "custom",
+      "refersTo": "route-switch",
+      "description": "34x20 track that fills with the route light when on; focus ring at 75% green.",
+      "html": "<button class=\"ds-route-switch\" role=\"switch\" aria-checked=\"true\"><i></i></button>",
+      "css": ".ds-route-switch { position: relative; width: 34px; height: 20px; padding: 0; border: 0; border-radius: 10px; background: #376d55; cursor: pointer; transition: background .2s; } .ds-route-switch i { position: absolute; top: 3px; left: 17px; width: 14px; height: 14px; border-radius: 50%; background: #e9e7e2; transition: left .2s cubic-bezier(.33,1,.68,1), background .2s; } .ds-route-switch[aria-checked=false] { background: #26262a; } .ds-route-switch[aria-checked=false] i { left: 3px; background: #8b8984; } .ds-route-switch:hover i { background: #efede9; } .ds-route-switch:focus-visible { outline: 2px solid rgb(76 195 138 / .75); outline-offset: 2px; }"
+    },
+    {
+      "name": "Add Tile",
+      "kind": "card",
+      "refersTo": "add-tile",
+      "description": "Dashed empty slot that closes the board.",
+      "html": "<button class=\"ds-add-tile\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\"><path d=\"M12 5v14M5 12h14\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" fill=\"none\"/></svg>Adicionar app</button>",
+      "css": ".ds-add-tile { font-family: Inter, system-ui, sans-serif; width: 230px; height: 168px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #26262a; border-radius: 14px; background: transparent; color: #8b8984; font-size: 14px; cursor: pointer; transition: border-color .2s, color .2s; } .ds-add-tile:hover { border-color: #49494a; background: rgb(255 255 255 / .02); color: #e9e7e2; } .ds-add-tile:focus-visible { outline: none; border-color: #376d55; color: #e9e7e2; }"
+    },
+    {
+      "name": "Message Bar (error)",
+      "kind": "custom",
+      "refersTo": "message-bar",
+      "description": "Floating result bar; errors in coral stay until dismissed, successes in green leave after 6s.",
+      "html": "<div class=\"ds-message ds-message-error\"><i class=\"ds-dot\"></i><span>Passar steam para a VPN falhou.</span><button class=\"ds-dismiss\" aria-label=\"Fechar\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\"><path d=\"M7 7l10 10M17 7L7 17\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" fill=\"none\"/></svg></button></div>",
+      "css": ".ds-message { font-family: Inter, system-ui, sans-serif; display: flex; align-items: flex-start; gap: 12px; padding: 10px 8px 10px 16px; border: 1px solid #335d4c; border-radius: 12px; background: #1c2323; color: #e9e7e2; font-size: 14px; max-width: 360px; } .ds-message-error { border-color: #694141; background: #251e21; } .ds-message span { flex: 1; padding-top: 6px; } .ds-message .ds-dot { margin-top: 11px; width: 7px; height: 7px; flex: none; border-radius: 50%; background: #4cc38a; box-shadow: 0 0 0 3px rgb(76 195 138 / .22); } .ds-message-error .ds-dot { background: #e5736b; box-shadow: 0 0 0 3px rgb(229 115 107 / .22); } .ds-dismiss { width: 32px; height: 32px; border: 0; border-radius: 10px; background: transparent; color: #8b8984; cursor: pointer; display: grid; place-items: center; } .ds-dismiss:hover, .ds-dismiss:focus-visible { background: #26262a; color: #e9e7e2; outline: none; }"
+    },
+    {
+      "name": "Menu",
+      "kind": "nav",
+      "refersTo": "menu",
+      "description": "Tile overflow and tray menus: actions, then profiles inline under a disabled header.",
+      "html": "<div class=\"ds-menu\"><div class=\"ds-item\">Reiniciar</div><div class=\"ds-item\">Parar</div><hr><div class=\"ds-item ds-header\">Perfil</div><div class=\"ds-item\">br</div><div class=\"ds-item ds-checked\">us</div></div>",
+      "css": ".ds-menu { font-family: Inter, system-ui, sans-serif; width: 150px; padding: 6px; border: 1px solid #26262a; border-radius: 12px; background: #19191c; color: #e9e7e2; font-size: 13px; } .ds-menu hr { border: 0; height: 1px; background: #26262a; margin: 6px 4px; } .ds-item { position: relative; padding: 8px 28px 8px 30px; border-radius: 8px; cursor: default; } .ds-item:hover { background: #26262a; } .ds-header { color: #8b8984; } .ds-header:hover { background: none; } .ds-checked::before { content: ''; position: absolute; left: 12px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: #4cc38a; box-shadow: 0 0 0 2px rgb(76 195 138 / .22); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Route Is the Light",
+    "overview": "VPNGo is a small dark board the user opens from the tray, reads in one glance, and closes. Every managed app is a tile, and the tile's light is its route: lit green while the app is on the VPN, unlit warm grey on the direct route, amber when the route cannot be confirmed, and sunk into the ground, hollow-dotted and dimmed, when the app is stopped. Color is read before any word; text confirms what the light already said.\n\nThe world is inherited, binding, from the owner's local search site: warm near-black neutrals, Inter for language, JetBrains Mono only for data, one connection color that carries state, 14px cards with an inset top highlight and a long soft shadow, and a faint radial glow at the top of the window that takes the overall state's color. Density is low and calm: three columns of 168px tiles at the default 760x520, generous inner space above the app name, nothing that looks like a settings table.\n\nMotion is state, never decoration. Route changes cross-fade the tile border, top tint and state dot over 600ms ease-out; the window glow follows the same curve; a busy app's dot breathes its halo on an 1100ms sine loop. Refresh never moves or rebuilds a tile under the pointer or a focused control.",
+    "keyCharacteristics": [
+      "Warm near-black ground with a single semantic accent (route green), plus amber for unverifiable routes and coral for failures.",
+      "Tiles are the only shadowed objects; everything else is flat with 1px hairlines.",
+      "Inter for words, JetBrains Mono for profile names, paths and endpoints.",
+      "Pills and rounded rectangles only; no sharp corners anywhere.",
+      "State is painted (dots, switch fill, border tint), and every state change animates."
+    ],
+    "rules": [
+      {
+        "name": "The Green Means On Rule",
+        "body": "Route green appears only where something is on, affirmative or focused: VPN route, checked box, success, keyboard focus, the overall glow. It never decorates a heading, a logo treatment or an idle control.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mixed, Not Invented Rule",
+        "body": "Intermediate tones are mixes of the palette (hairline toward green, surface toward ground, muted toward ground), not new hexes. New states derive the same way.",
+        "section": "colors"
+      },
+      {
+        "name": "The Data Is Mono Rule",
+        "body": "Profile names, file paths and endpoints set in JetBrains Mono; route words, actions and labels set in Inter, even on the same line (\"us · VPN\").",
+        "section": "typography"
+      },
+      {
+        "name": "The Only Tiles Float Rule",
+        "body": "Shadows belong to app tiles. Pills, buttons, inputs, menus, dialogs and the message bar stay flat and are separated by hairlines and tone.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** let the tile itself carry the route: border, top tint and dot change together over 600ms ease-out.",
+      "**Do** derive new tones by mixing palette colors (the Mixed, Not Invented Rule) instead of adding hexes.",
+      "**Do** set profile names, paths and endpoints in JetBrains Mono and every word around them in Inter.",
+      "**Do** keep a stopped app visibly sunk: no shadow, no highlight, dimmed title, hollow dot, \"Iniciar\" in place of the switch.",
+      "**Do** keep at most one bone primary button per view; everything else is a ghost pill.",
+      "**Do** update state in place; never move or rebuild a tile, menu or control the user is pointing at or focused on."
+    ],
+    "donts": [
+      "**Don't** arrange apps as rows of names with a status column; apps are tiles on a board.",
+      "**Don't** use route green for anything that is not on, affirmative or focused.",
+      "**Don't** add shadows to anything but app tiles.",
+      "**Don't** introduce sharp corners or borders heavier than 1px.",
+      "**Don't** use mono for labels, actions or route words."
+    ]
+  }
+}

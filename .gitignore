@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+/dist/
+/VERSION
+.impeccable/review/
+.impeccable/mocks/
+.impeccable/build/
+.impeccable/decision-surface.json
