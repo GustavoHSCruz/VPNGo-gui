@@ -16,7 +16,8 @@ GUI_REPOSITORY = "GustavoHSCruz/VPNGo-gui"
 def latest(repository):
     data = json.loads(engine.fetch(f"https://api.github.com/repos/{repository}/releases/latest"))
     tag = str(data.get("tag_name", ""))
-    if not tag.startswith("v") or not engine.parse_version(tag):
+    # parse_version needs a word boundary before the number, which "v0.4.0" lacks.
+    if not tag.startswith("v") or not engine.parse_version(tag[1:]):
         raise engine.EngineError(f"Could not read the latest release of {repository}.")
     return tag[1:]
 
