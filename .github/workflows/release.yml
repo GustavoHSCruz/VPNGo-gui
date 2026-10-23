@@ -1,7 +1,9 @@
 name: Release
 
 # Pushing a tag such as v1.2.3 tests, builds and publishes the archive that
-# `vpngo --install-gui` downloads. Running it by hand stops before publishing.
+# `vpngo --install-gui` downloads, and VPNGo-Setup.exe, the Windows installer
+# (setup/, compiled with Nuitka and tested on Windows). Running it by hand stops
+# before publishing.
 on:
   push:
     tags: ['v*']
@@ -44,9 +46,63 @@ jobs:
           name: dist
           path: dist/
 
+  windows_setup:
+    needs: build
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Build VPNGo-Setup.exe
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check nuitka zstandard -r requirements.txt
+          (Get-Content setup\main.py -Raw).Replace('VERSION = "dev"', "VERSION = `"$env:VERSION`"") | Set-Content setup\main.py -NoNewline
+          $FileVersion = $env:VERSION.Split('-')[0]
+          python -m nuitka --onefile --assume-yes-for-downloads --enable-plugin=pyside6 `
+            --windows-console-mode=disable --windows-icon-from-ico=setup\vpngo.ico `
+            --include-data-dir=vpngo_gui\assets=vpngo_gui\assets --include-data-files=setup\vpngo.ico=vpngo.ico `
+            --product-name=VPNGo --file-description="VPNGo Setup" --company-name=GustavoHSCruz `
+            --product-version=$FileVersion --file-version=$FileVersion `
+            --output-dir=build --output-filename=VPNGo-Setup.exe setup\main.py
+          if (-not (Test-Path build\VPNGo-Setup.exe)) { throw 'Nuitka did not produce VPNGo-Setup.exe.' }
+      - name: Install, upgrade and uninstall silently
+        shell: pwsh
+        run: |
+          $Shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\VPNGo.lnk'
+          $Log = Join-Path $env:TEMP 'VPNGo-Setup.log'
+          function Setup($Arguments) {
+            $Process = Start-Process build\VPNGo-Setup.exe -ArgumentList $Arguments -PassThru -Wait
+            if ($Process.ExitCode -ne 0) { Get-Content $Log; throw "VPNGo-Setup.exe $Arguments failed (exit $($Process.ExitCode))." }
+          }
+          Setup @('--silent', '--cli-only')
+          $Output = & (Join-Path $HOME 'bin\vpngo.cmd') version
+          if ($Output -notlike 'vpngo *') { throw "Unexpected version output: $Output" }
+          if (Test-Path $Shortcut) { throw 'The command-only install added the Start menu shortcut.' }
+          Setup @('--silent')
+          if (-not (Test-Path $Shortcut)) { throw 'The install with the interface did not add the Start menu shortcut.' }
+          $Gui = & (Join-Path $env:LOCALAPPDATA 'vpngo-gui\venv\Scripts\python.exe') (Join-Path $env:LOCALAPPDATA 'vpngo-gui\app\run.py') --version
+          if ($Gui -notlike 'vpngo-gui *') { throw "Unexpected interface version output: $Gui" }
+          $Copy = Join-Path $env:LOCALAPPDATA 'vpngo\setup\VPNGo-Setup.exe'
+          $Process = Start-Process $Copy -ArgumentList '--uninstall', '--silent' -PassThru -Wait
+          if ($Process.ExitCode -ne 0) { Get-Content $Log; throw "Uninstall failed (exit $($Process.ExitCode))." }
+          Start-Sleep -Seconds 6  # The setup copy is removed by a helper after it exits.
+          foreach ($Path in @((Join-Path $env:LOCALAPPDATA 'vpngo\app'), (Join-Path $env:LOCALAPPDATA 'vpngo\setup'),
+                              (Join-Path $HOME 'bin\vpngo.cmd'), $Shortcut, (Join-Path $env:LOCALAPPDATA 'vpngo-gui\app'))) {
+            if (Test-Path $Path) { throw "The uninstall left $Path behind." }
+          }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-setup
+          path: build/VPNGo-Setup.exe
+          if-no-files-found: error
+
   publish:
     if: github.ref_type == 'tag'
-    needs: build
+    needs: [build, windows_setup]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -59,9 +115,14 @@ jobs:
         with:
           name: dist
           path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-setup
+          path: dist
       - run: |
+          (cd dist && sha256sum VPNGo-Setup.exe >> SHA256SUMS && sha256sum -c SHA256SUMS)
           prerelease=
           case "$VERSION" in *-*) prerelease=--prerelease ;; esac
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "vpngo-gui $VERSION" \
-            --notes "Install or upgrade with \`python3 install.py\` (no vpngo needed; it uses or downloads vpngo) or \`vpngo --install-gui\` (vpngo 0.5.0 or newer)." \
+            --notes "Windows: download and run \`VPNGo-Setup.exe\`; it installs vpngo and the interface (or only the command), and \`VPNGo-Setup.exe --silent\` does it without questions. Elsewhere, install or upgrade with \`python3 install.py\` (no vpngo needed; it uses or downloads vpngo) or \`vpngo --install-gui\` (vpngo 0.5.0 or newer)." \
             --generate-notes --verify-tag $prerelease
